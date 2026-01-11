@@ -1,0 +1,28 @@
+# 开发相关
+.vscode/**
+.vscode-test/**
+src/**
+node_modules/**
+.pytest_cache/**
+**/tsconfig.json
+**/.eslintrc.js
+**/.eslintrc.json
+**/*.map
+**/*.ts
+
+# 文档和说明文件（非必要）
+PUBLISH.md
+doc/**
+language-configuration-explained.md
+npm-guide.md
+generate_icon.sh
+.gitignore
+
+# 开发脚本
+script/**
+
+# 其他
+.gitignore
+.yarnrc
+vsc-extension-quickstart.md
+*.vsix

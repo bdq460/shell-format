@@ -1,0 +1,113 @@
+{
+    "name": "shell-format",
+    "displayName": "Shell format with shfmt",
+    "description": "Format shell scripts using shfmt and show errors in Problems panel",
+    "version": "1.0.0",
+    "publisher": "bdq460",
+    "icon": "icon.png",
+    "repository": {
+        "type": "git",
+        "url": "https://github.com/bdq460/shell-format.git"
+    },
+    "engines": {
+        "vscode": "^1.74.0"
+    },
+    "categories": [
+        "Formatters",
+        "Linters"
+    ],
+    "activationEvents": [
+        "onLanguage:shellscript",
+        "onCommand:shellformat.formatDocument",
+        "onCommand:shellformat.fixAllProblems"
+    ],
+    "main": "./dist/extension.js",
+    "contributes": {
+        "languages": [
+            {
+                "id": "shellscript",
+                "aliases": [
+                    "Shell",
+                    "Shell Script"
+                ],
+                "extensions": [
+                    ".sh",
+                    ".bash",
+                    ".zsh"
+                ],
+                "configuration": "./language-configuration.json"
+            }
+        ],
+        "configuration": {
+            "type": "object",
+            "title": "Shell Format",
+            "properties": {
+                "shellformat.path": {
+                    "type": "string",
+                    "default": "shfmt",
+                    "description": "Path to shfmt executable"
+                },
+                "shellformat.args": {
+                    "type": "array",
+                    "default": [
+                        "-i",
+                        "2",
+                        "-bn",
+                        "-ci",
+                        "-sr"
+                    ],
+                    "description": "Arguments to pass to shfmt"
+                },
+                "shellformat.onError": {
+                    "type": "string",
+                    "enum": [
+                        "showProblem",
+                        "ignore"
+                    ],
+                    "default": "showProblem",
+                    "description": "How to handle shfmt errors"
+                }
+            }
+        },
+        "commands": [
+            {
+                "command": "shellformat.formatDocument",
+                "title": "Format Document"
+            },
+            {
+                "command": "shellformat.fixAllProblems",
+                "title": "Fix All Problems"
+            }
+        ],
+        "codeActions": [
+            {
+                "kind": "source.fixAll.shell-format",
+                "title": "Fix all with shfmt",
+                "languages": [
+                    "shellscript"
+                ]
+            }
+        ],
+        "configurationDefaults": {
+            "[shellscript]": {
+                "editor.defaultFormatter": "bdq460.shell-format"
+            }
+        }
+    },
+    "scripts": {
+        "vscode:prepublish": "npm run compile",
+        "compile": "tsc -p ./",
+        "watch": "tsc -watch -p ./",
+        "pretest": "npm run compile && npm run lint",
+        "lint": "eslint src --ext ts",
+        "test": "node ./out/test/runTest.js"
+    },
+    "devDependencies": {
+        "@types/node": "^18.0.0",
+        "@types/vscode": "^1.74.0",
+        "@typescript-eslint/eslint-plugin": "^6.0.0",
+        "@typescript-eslint/parser": "^6.0.0",
+        "eslint": "^8.0.0",
+        "typescript": "^5.0.0"
+    }
+}

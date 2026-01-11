@@ -1,0 +1,17 @@
+#!/bin/bash
+
+# 示例脚本 - 用于测试 shfmt 格式化
+if [ -f "test.txt" ]; then
+  echo "文件存在".
+  cat est.txt | grep "hello"
+else
+  echo "文件不存在".
+fi
+
+# 函数定义
+local name=$1
+echo "Hello, $name!"
+
+
+# 调用函数
+hello "World".
