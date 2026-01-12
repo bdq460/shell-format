@@ -69,6 +69,44 @@ npx vsce package
 
 打包时 `doc/user/README.md` 会被复制为根目录的 `README.md`，作为插件市场首页。
 
+### 本地安装
+
+#### 方式1 ：通过界面安装
+
+1. 右键单击生成的.vsix文件
+2. 选择 "安装扩展VSIX"
+
+#### 方式2 ：通过命令安装
+
+```shell
+code  --install-extension shell-format.vsix --extension-dir ~/.vscode/extensions
+```
+
+#### 安装结果检查
+
+有多种方式可以检查扩展是否安装成功：
+
+1. 打开扩展市场，筛选设置"已安装", 搜索 "shell-format"
+2. 执行命令code --list-extensions | grep shell-format
+3. 执行命令ll ~/.vscode/extensions/ | grep shell-format
+
+### 发布到市场
+
+检查没问题后, 可以发布到市场, 前提是要有自己的账号.
+
+ 1. 登录VSCode Marketplace, 地址是 <https://marketplace.visualstudio.com/>
+ 2. 点击右上角的"发布者"按钮, 进入发布者页面
+ 3. 点击 "新建" 按钮
+ 4. 填写相关信息
+ 5. 上传vsix文件
+ 6. 填写描述信息
+ 7. 填写标签
+ 8. 填写图标
+ 9. 填写截图
+ 10. 填写预览图片
+ 11. 填写预览视频
+ 12. 点击 "发布" 按钮
+
 ## 项目结构
 
 ```tree

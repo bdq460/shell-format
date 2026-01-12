@@ -62,7 +62,7 @@ Shell Format 插件提供两个核心功能:
 
 ### 工作原理
 
-```
+```flow
 用户操作
     ↓
 VSCode API
