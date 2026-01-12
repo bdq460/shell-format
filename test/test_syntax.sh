@@ -19,4 +19,3 @@ hello() {
 
 # 语法错误：命令错误
 local name=$1
-

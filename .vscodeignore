@@ -10,18 +10,21 @@ node_modules/**
 **/*.map
 **/*.ts
 
-# 文档和说明文件（非必要）
-PUBLISH.md
-doc/**
-language-configuration-explained.md
-npm-guide.md
-generate_icon.sh
-.gitignore
+# 开发文档（排除）
+doc/developer/**
+doc/packaging/**
+doc/configuration/**
 
-# 开发脚本
-script/**
+# 用户文档（保留）
+doc/user/**
+doc/tools/**
+
+# 根目录文档
+PROJECT_SUMMARY.md    # 开发文档，排除
+DOC_REFACTORING.md    # 临时文档，排除
 
 # 其他
+generate_icon.sh
 .gitignore
 .yarnrc
 vsc-extension-quickstart.md

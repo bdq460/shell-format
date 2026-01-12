@@ -30,8 +30,8 @@
 ```json
 "activationEvents": [
   "onLanguage:shellscript",                  // 打开 shell 脚本时激活
-  "onCommand:shellformat.formatDocument",    // 执行特定命令时激活
-  "onCommand:shellformat.fixAllProblems",   // 执行特定命令时激活
+  "onCommand:shell-format.formatDocument",    // 执行特定命令时激活
+  "onCommand:shell-format.fixAllProblems",   // 执行特定命令时激活
 ]
 ```
 
@@ -74,15 +74,33 @@
   "type": "object",
   "title": "Shell Format",
   "properties": {
-    "shellformat.path": {
+    "shell-format.shellcheckPath": {
+      "type": "string",
+      "default": "shellcheck",
+      "description": "Path to shellcheck executable"
+    },
+    "shell-format.shfmtPath": {
       "type": "string",
       "default": "shfmt",
       "description": "Path to shfmt executable"
     },
-    "shellformat.args": {
-      "type": "array",
-      "default": ["-i", "2", "-bn", "-ci", "-sr"],
-      "description": "Arguments to pass to shfmt"
+    "shell-format.logOutput": {
+        "type": "string",
+        "enum": [
+            "off",
+            "on"
+        ],
+        "default": "off",
+        "description": "Output log information to console and output window! value can be one of [off, on]. default is off"
+    },
+    "shell-format.onError": {
+        "type": "string",
+        "enum": [
+            "showProblem",
+            "ignore"
+        ],
+        "default": "showProblem",
+        "description": "How to handle shfmt errors"
     }
   }
 }
@@ -90,16 +108,42 @@
 
 ### 3. 命令 (commands)
 
+定义命令, 所定义的命令由命令面板、快捷键触发, 全局，不依赖代码问题, 需主动执行。
+
 ```json
 "commands": [
   {
-    "command": "shellformat.formatDocument",  // 命令 ID
+    "command": "shell-format.formatDocument",  // 命令 ID
     "title": "Format Document"                // 显示标题
   }
 ]
 ```
 
+注意：这里只是声明命令, 需要通过 vscode.commands.registerCommand() 注册命令及命令实现, 才能使命令可用
+
+```JavaScript
+// 注册命令
+const formatDocumentCommand = vscode.commands.registerCommand(
+    'shell-format.formatDocument',
+    () => {
+        // 格式化文档的逻辑
+    }
+);
+```
+
+使用方式
+
+- 命令面板输入 "Format Document" 或 "Fix All Problems"
+- 可以绑定快捷键
+- 可以在代码中通过 vscode.commands.executeCommand() 调用
+
 ### 4. 代码操作 (codeActions)
+
+定义代码操作, 所定义的代码操作通过点击灯泡图标执行, 仅在有代码问题时显示, 主要针对问题修复
+
+kind：操作类型，source.fixAll 表示自动修复类型，shell-format 是扩展自定义的标识
+title：显示给用户的操作名称
+languages：在哪些语言文件中显示此操作
 
 ```json
 "codeActions": [
@@ -110,6 +154,43 @@
   }
 ]
 ```
+
+注意, 这里只是声明action, 需要通过 vscode.languages.registerCodeActionsProvider() 注册代码操作提供者, 才能使代码操作可用
+
+```JavaScript
+// 注册代码操作提供者
+const codeActionProvider = vscode.languages.registerCodeActionsProvider(
+    'shellscript',
+    {
+        provideCodeActions(document, range, context, token) {
+            // 返回修复操作
+            const actions = [];
+            actions.push({
+                title: 'Fix all with shfmt',
+                kind: 'source.fixAll.shell-format',
+                command: {
+                    command: 'shell-format.fixAllProblems',
+                    title: 'Fix all with shfmt'
+                }
+            });
+            return actions;
+        }
+    }
+);
+```
+
+使用方式：
+
+- 当 VSCode 检测到问题时，会在代码编辑器左侧显示黄色灯泡
+- 点击灯泡后显示 "Fix all with shfmt" 选项
+- 选中后执行修复操作
+
+#### 完整的用户体验流程
+
+- 用户打开一个 Shell 脚本文件
+- 发现问题 → 代码左侧显示黄色灯泡
+- 点击灯泡 → 显示 "Fix all with shfmt" (codeAction)
+- 选择修复 → 执行 shell-format.fixAllProblems (command)
 
 ## 脚本 (scripts)
 

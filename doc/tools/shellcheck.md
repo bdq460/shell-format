@@ -1,4 +1,4 @@
-# Shellcheck 指南
+# Shellcheck 使用指南
 
 本文档介绍 shellcheck 的使用方法、常见错误代码和最佳实践。
 
@@ -343,27 +343,7 @@ find . -type f -print0 | while IFS= read -r -d $'\0' file; do
 done
 ```
 
-## Shellcheck 在 VSCode 中的使用
-
-### 自动诊断
-
-本插件会自动在以下情况下运行 shellcheck：
-
-- 打开 Shell 脚本文件时
-- 保存 Shell 脚本文件时
-- 编辑 Shell 脚本文件时（带防抖）
-
-### 查看错误
-
-打开 VSCode 的"问题"面板（`Ctrl+Shift+M` / `Cmd+Shift+M`），可以看到 shellcheck 检测到的所有错误。
-
-错误信息格式：
-
-- `SCXXXX`: 错误代码
-- 错误描述
-- 错误位置（文件名、行号、列号）
-
-### 忽略特定警告
+### 7. 忽略特定警告
 
 如果某些警告需要忽略，可以在脚本中使用注释：
 
@@ -377,10 +357,6 @@ local unused_var="test"
 ```
 
 ## 常见问题
-
-### Q: Shellcheck 找不到命令怎么办？
-
-A: 确保已正确安装 shellcheck 并将其路径添加到系统 PATH 中。在 VSCode 中可以通过配置 `shellformat.shellcheckPath` 指定路径。
 
 ### Q: 如何禁用特定警告？
 

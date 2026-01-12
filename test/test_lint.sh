@@ -8,10 +8,12 @@ else
   echo "文件不存在".
 fi
 
-# 函数定义
-local name=$1
+# 变量定义
+let name="Klein"
 echo "Hello, $name!"
-
+if [ "$name" = "Klein" ]; then
+  echo "你好，Klein"
+fi
 
 # 调用函数
 hello "World".

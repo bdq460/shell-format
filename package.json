@@ -1,7 +1,7 @@
 {
     "name": "shell-format",
-    "displayName": "Shell format with shfmt",
-    "description": "Format shell scripts using shfmt and show errors in Problems panel",
+    "displayName": "Shell format with shell-shfmt",
+    "description": "Format shell scripts with shellcheck and shfmt, show errors in 'Problems' plate",
     "version": "1.0.0",
     "publisher": "bdq460",
     "icon": "icon.png",
@@ -18,8 +18,8 @@
     ],
     "activationEvents": [
         "onLanguage:shellscript",
-        "onCommand:shellformat.formatDocument",
-        "onCommand:shellformat.fixAllProblems"
+        "onCommand:shell-format.formatDocument",
+        "onCommand:shell-format.fixAllProblems"
     ],
     "main": "./dist/extension.js",
     "contributes": {
@@ -42,23 +42,26 @@
             "type": "object",
             "title": "Shell Format",
             "properties": {
-                "shellformat.path": {
+                "shell-format.shellcheckPath": {
+                    "type": "string",
+                    "default": "shellcheck",
+                    "description": "Path to shellcheck executable"
+                },
+                "shell-format.shfmtPath": {
                     "type": "string",
                     "default": "shfmt",
                     "description": "Path to shfmt executable"
                 },
-                "shellformat.args": {
-                    "type": "array",
-                    "default": [
-                        "-i",
-                        "2",
-                        "-bn",
-                        "-ci",
-                        "-sr"
+                "shell-format.logOutput": {
+                    "type": "string",
+                    "enum": [
+                        "off",
+                        "on"
                     ],
-                    "description": "Arguments to pass to shfmt"
+                    "default": "off",
+                    "description": "Output log information to console and output window! value can be one of [off, on]. default is off"
                 },
-                "shellformat.onError": {
+                "shell-format.onError": {
                     "type": "string",
                     "enum": [
                         "showProblem",
@@ -71,36 +74,39 @@
         },
         "commands": [
             {
-                "command": "shellformat.formatDocument",
-                "title": "Format Document"
+                "command": "shell-format.formatDocument",
+                "title": "Format document with shell-format"
             },
             {
-                "command": "shellformat.fixAllProblems",
-                "title": "Fix All Problems"
+                "command": "shell-format.fixAllProblems",
+                "title": "Fix all problems with shell-format"
             }
         ],
         "codeActions": [
             {
+                "kind": "quickfix.shell-format",
+                "title": "Fix this issue with shell-format",
+                "languages": [
+                    "shellscript"
+                ]
+            },
+            {
                 "kind": "source.fixAll.shell-format",
-                "title": "Fix all with shfmt",
+                "title": "Fix all problems with shell-formatt",
                 "languages": [
                     "shellscript"
                 ]
             }
-        ],
-        "configurationDefaults": {
-            "[shellscript]": {
-                "editor.defaultFormatter": "bdq460.shell-format"
-            }
-        }
+        ]
     },
     "scripts": {
-        "vscode:prepublish": "npm run compile",
+        "vscode:prepublish": "npm run compile && npm run copy-readme",
         "compile": "tsc -p ./",
         "watch": "tsc -watch -p ./",
         "pretest": "npm run compile && npm run lint",
         "lint": "eslint src --ext ts",
-        "test": "node ./out/test/runTest.js"
+        "test": "node ./out/test/runTest.js",
+        "copy-readme": "cp doc/user/README.md README.md"
     },
     "devDependencies": {
         "@types/node": "^18.0.0",
