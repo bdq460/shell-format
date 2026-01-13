@@ -27,6 +27,7 @@
 | 文档 | 目标读者 | 场景 |
 |-----|---------|------|
 | [user/README.md](user/README.md) | 已安装插件的用户 | 查看插件功能、配置和使用方法 |
+| [user/README_EN.md](user/README_EN.md) | English-speaking users | View plugin features, configuration, and usage methods |
 
 ### 开发者文档
 

@@ -198,18 +198,62 @@ const codeActionProvider = vscode.languages.registerCodeActionsProvider(
 
 ```json
 "scripts": {
-  "vscode:prepublish": "npm run compile",    // 发布前执行
+  "vscode:prepublish": "npm run compile",    // 发布前执行, 自动触发（VSCode 命令）
   "compile": "tsc -p ./",                    // 编译 TypeScript
   "watch": "tsc -watch -p ./",               // 监听模式编译
   "pretest": "npm run compile && npm run lint",  // 测试前执行
   "lint": "eslint src --ext ts",             // 代码检查
-  "test": "node ./out/test/runTest.js"       // 运行测试
+  "test": "node ./test/runTest.js"       // 运行测试
 }
 ```
 
 运行方式为 `npm run <script>`
 
 **注意**：`scripts` 字段不会包含在打包文件中，仅在开发和构建阶段使用。
+
+### 触发场景
+
+#### 1. vscode:prepublish - 自动触发（VSCode 命令）
+
+这是唯一一个可能自动触发的脚本：
+
+- 使用 `vsce publish` 命令发布扩展时，VSCode CLI 会自动执行
+- 使用 `vsce package` 命令打包扩展时，VSCode CLI 会自动执行
+
+#### 2. 其他脚本 - 全部手动触发
+
+| 脚本 | 触发方式 | 使用场景 |
+|-----|---------|---------|
+| `compile` | `npm run compile` | 编译 TypeScript 代码 |
+| `watch` | `npm run watch` | 监听模式，代码变更时自动重新编译 |
+| `pretest` | `npm test`（自动触发） | 测试前编译和检查 |
+| `lint` | `npm run lint` | 运行 ESLint 代码检查 |
+| `test` | `npm test` | 运行测试 |
+
+#### 3. npm 脚本钩子
+
+npm 脚本支持 pre/post 钩子机制：
+
+| 钩子 | 触发时机 | vsce 是否触发 |
+|-----|---------|-------------|
+| `preinstall` | `npm install` 前 | ❌ 否 |
+| `postinstall` | `npm install` 后 | ❌ 否 |
+| `prepublishOnly` | `npm publish` 前 | ❌ 否 |
+| `prepack` | `npm pack` 前 | ❌ 否 |
+| `postpack` | `npm pack` 后 | ❌ 否 |
+| `prepare` | `npm pack/publish` 前 | ❌ 否 |
+| `pretest` | `npm test` 前 | ❌ 否 |
+| `posttest` | `npm test` 后 | ❌ 否 |
+
+**注意**：以上 npm 钩子 vsce 不会触发，仅在直接使用 npm 命令时有效。
+
+**常用示例**：
+
+```bash
+npm test        # 会自动执行 pretest 脚本
+npm publish     # 会自动执行 prepublishOnly、prepack、prepare 脚本
+npm pack       # 会自动执行 prepack、prepare 脚本
+```
 
 ## 依赖 (devDependencies)
 
