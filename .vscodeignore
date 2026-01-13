@@ -9,6 +9,7 @@ node_modules/**
 **/.eslintrc.json
 **/*.map
 **/*.ts
+test/**
 
 # 开发文档（排除）
 doc/developer/**

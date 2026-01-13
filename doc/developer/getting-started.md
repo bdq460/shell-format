@@ -87,7 +87,7 @@ shfmt / shellcheck
 推荐安装以下扩展:
 
 - **ESLint**: 代码检查
-- **Prettier**: 代码格式化（可选）
+- **Prettier - Code formatter**: 代码格式化（可选）
 - **TypeScript Importer**: 自动导入
 
 ### 2. 配置 VSCode

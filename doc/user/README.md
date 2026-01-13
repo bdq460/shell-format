@@ -20,30 +20,53 @@
 {
   "shell-format.shellcheckPath": "shellcheck",
   "shell-format.shfmtPath": "shfmt",
+  "shell-format.tabSize": 2,
   "shell-format.logOutput": "off",
-  "shell-format.onError": "showProblem"
+  "shell-format.onError": "showProblem",
 }
 ```
 
 ### 配置说明
 
-| 配置项 | 类型 | 默认值 | 说明 |
-|-------|------|--------|------|
-| `shellcheckPath` | string | "shellcheck" | shellcheck 可执行文件路径 |
-| `shfmtPath` | string | "shfmt" | shfmt 可执行文件路径 |
-| `logOutput` | "off" \| "on" | "off" | 是否输出日志到控制台和输出窗口 |
-| `onError` | "showProblem" \| "ignore" | "showProblem" | 错误处理方式 |
+#### `shell-format.shellcheckPath`
 
-### 自定义路径示例
+- **类型**: string
+- **默认值**: `shellcheck`
+- **说明**: shellcheck 可执行文件路径
 
-```json
-{
-  "shell-format.shellcheckPath": "/usr/local/bin/shellcheck",
-  "shell-format.shfmtPath": "/usr/local/bin/shfmt",
-  "shell-format.logOutput": "on",
-  "shell-format.onError": "showProblem"
-}
-```
+#### `shell-format.shfmtPath`
+
+- **类型**: string
+- **默认值**: `shfmt`
+- **说明**: shfmt 可执行文件路径
+
+#### `shell-format.tabSize`
+
+- **类型**: number | string
+- **可选值**:
+  - `vscode`: 使用 VSCode 的缩进设置
+  - `ignore`: 不校验缩进
+  - 数字：表示空格数（如 `2`、`4`）
+- **默认值**: `vscode`
+- **说明**: 缩进设置
+
+#### `shell-format.logOutput`
+
+- **类型**: string
+- **可选值**:
+  - `off`: 关闭日志输出
+  - `on`: 开启日志输出
+- **默认值**: `off`
+- **说明**: 是否输出日志到控制台和输出窗口
+
+#### `shell-format.onError`
+
+- **类型**: string
+- **可选值**:
+  - `ignore`: 忽略错误
+  - `showProblem`: 显示问题
+- **默认值**: `showProblem`
+- **说明**: 错误处理方式
 
 ## 插件命令
 
@@ -273,6 +296,13 @@ go install github.com/koalaman/shellcheck/cmd/shellcheck@latest
 ```
 
 > 注意：shellcheck 是可选的，如果未安装，插件将只使用 shfmt 进行格式化和基础检查。
+
+## 联系开发者
+
+如有问题或建议，欢迎通过以下方式联系：
+
+- **GitHub Issues**: [提交 Issue](https://github.com/bdq460/shell-format/issues)
+- **Email**: [发送邮件](mailto:bdq460@gmail.com)
 
 ## 链接
 

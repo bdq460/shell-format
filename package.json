@@ -69,6 +69,18 @@
                     ],
                     "default": "showProblem",
                     "description": "How to handle shfmt errors"
+                },
+                "shell-format.tabSize": {
+                    "type": [
+                        "number",
+                        "enum"
+                    ],
+                    "enum": [
+                        "vscode",
+                        "ignore"
+                    ],
+                    "default": "vscode",
+                    "description": "Indentation size: number for spaces or 'tab' for tabs (used with shfmt -i/-tabs), value can be one of [vscode, ignore] or number. vscode:use vscode tab size, ignore: ignore tab check and format.default is vscode"
                 }
             }
         },
@@ -100,20 +112,27 @@
         ]
     },
     "scripts": {
+        "package:extension": "npx @vscode/vsce package && npm run clean",
+        "install:extension": "npm run package:extension && code --install-extension $(ls shell-format-*.vsix) --extensions-dir ~/.vscode/extensions",
         "vscode:prepublish": "npm run compile && npm run copy-readme",
+        "clean": "rm -rf dist/*",
         "compile": "tsc -p ./",
         "watch": "tsc -watch -p ./",
-        "pretest": "npm run compile && npm run lint",
+        "pretest": "npm run compile",
         "lint": "eslint src --ext ts",
-        "test": "node ./out/test/runTest.js",
-        "copy-readme": "cp doc/user/README.md README.md"
+        "test": "node test/run.js",
+        "copy-readme": "cp doc/user/README_EN.md README.md"
     },
     "devDependencies": {
+        "@types/mocha": "^10.0.10",
         "@types/node": "^18.0.0",
         "@types/vscode": "^1.74.0",
         "@typescript-eslint/eslint-plugin": "^6.0.0",
         "@typescript-eslint/parser": "^6.0.0",
+        "chai": "^4.5.0",
         "eslint": "^8.0.0",
+        "mocha": "^10.8.2",
+        "ts-node": "^10.9.2",
         "typescript": "^5.0.0"
     }
 }
