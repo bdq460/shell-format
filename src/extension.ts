@@ -119,6 +119,31 @@ export function activate(context: vscode.ExtensionContext) {
     );
 
     // 注册 Code Actions 提供者
+    //
+    // QuickFix 和 SourceFixAll 的区别
+    //
+    // vscode.CodeActionKind.QuickFix
+    //  - 用途：修复特定的、局部的问题
+    //  - 触发方式：在代码中右键或按 Cmd +.时显示的灯泡菜单
+    //  - 不需要自定义子类型，因为它不通过 codeActionsOnSave 触发
+    //
+    // vscode.CodeActionKind.SourceFixAll
+    //   - 用途：修复整个文档的所有问题
+    //   - 触发方式：通过 editor.codeActionsOnSave 配置在保存时自动执行
+    //   - 需要自定义子类型（如.append('shell-format')），这样才能在 codeActionsOnSave 中精确控制
+    //
+    // 为什么不需要给 QuickFix append？
+    // 1. QuickFix 不在 codeActionsOnSave 中使用
+    //    editor.codeActionsOnSave 只支持 SourceFixAll 类型的 CodeAction，不支持 QuickFix 类型。
+    // 2. QuickFix 是用户手动触发的
+    //    当你在代码上看到错误提示时：
+    //    - 点击灯泡图标 💡
+    //    - 或按 Cmd +. / Ctrl +.
+    //
+    // VS Code 会调用 provideCodeActions() 方法，返回所有的 CodeAction，包括：
+    //  - QuickFix 类型：修复单个问题
+    //  - SourceFixAll 类型：修复所有问题
+    // 此时不需要区分是哪个扩展的 QuickFix，因为用户会自己选择。
     log('Registering code actions provider');
     const codeActionProvider = vscode.languages.registerCodeActionsProvider(
         PackageInfo.languageId,
@@ -126,7 +151,7 @@ export function activate(context: vscode.ExtensionContext) {
         {
             providedCodeActionKinds: [
                 vscode.CodeActionKind.QuickFix,
-                vscode.CodeActionKind.SourceFixAll
+                vscode.CodeActionKind.SourceFixAll.append(PackageInfo.extensionName)
             ]
         }
     );

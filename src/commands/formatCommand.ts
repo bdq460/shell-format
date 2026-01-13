@@ -6,6 +6,7 @@
 import * as vscode from 'vscode';
 import { formatDocument } from '../formatters/documentFormatter';
 import { PackageInfo } from '../utils/extensionInfo';
+import { log } from '../utils/logger';
 
 /**
  * 注册格式化文档命令
@@ -15,6 +16,8 @@ export function registerFormatCommand(): vscode.Disposable {
         PackageInfo.commandFormatDocument,
         async () => {
             const editor = vscode.window.activeTextEditor;
+            log(`Format document command triggered! Document: ${editor?.document.fileName}`);
+
             if (editor) {
                 await formatDocument(editor.document);
             }

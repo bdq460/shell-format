@@ -2,18 +2,19 @@
 
 # 示例脚本 - 用于测试 shfmt 格式化
 if [ -f "test.txt" ]; then
-  echo "文件存在".
-  cat est.txt | grep "hello"
+    echo "文件存在".
+    cat est.txt | grep "hello"
 else
-  echo "文件不存在".
+    echo "文件不存在".
 fi
 
 # 变量定义
-let name="Klein"
+name="Klein"
 echo "Hello, $name!"
 if [ "$name" = "Klein" ]; then
-  echo "你好，Klein"
-fi
+    echo "你好，Klein"
 
+
+if
 # 调用函数
 hello "World".

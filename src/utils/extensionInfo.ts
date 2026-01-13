@@ -3,9 +3,9 @@
  * 统一管理从 package.json 读取的配置信息
  */
 
-import { log } from 'console';
 import * as vscode from 'vscode';
 import * as packageJson from '../../package.json';
+import { log } from '../utils/logger';
 
 interface Command {
     command: string;
@@ -165,9 +165,8 @@ export class PackageInfo {
      * @returns 用于标识诊断信息的来源名称
      */
     static get diagnosticSource(): string {
-        return this.extensionName;
+        return `${this.publisher}.${this.extensionName}`;
     }
-
     // ==================== 默认配置 ====================
 
     /**

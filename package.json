@@ -55,7 +55,7 @@
                 "shell-format.tabSize": {
                     "type": [
                         "number",
-                        "enum"
+                        "string"
                     ],
                     "enum": [
                         "vscode",
@@ -104,7 +104,7 @@
             },
             {
                 "kind": "source.fixAll.shell-format",
-                "title": "Fix all problems with shell-formatt",
+                "title": "Fix all problems with shell-format",
                 "languages": [
                     "shellscript"
                 ]

@@ -5,6 +5,7 @@
 
 import { spawn } from 'child_process';
 import * as vscode from 'vscode';
+import { PackageInfo } from '../utils/extensionInfo';
 import { log } from '../utils/logger';
 import { logShellCommandCloseOutput, logShellCommandErrorOutput } from '../utils/shell';
 import {
@@ -75,7 +76,7 @@ export async function checkWithShellcheck(document: vscode.TextDocument): Promis
 
             const errorDiagnostic = createSpawnErrorDiagnostic(
                 document,
-                'shellcheck',
+                PackageInfo.diagnosticSource,
                 fullCommand,
                 err
             );
@@ -121,7 +122,7 @@ function parseShellcheckOutput(document: vscode.TextDocument, output: string): v
                             vscode.DiagnosticSeverity.Information
                 );
                 diagnostic.code = scCode;
-                diagnostic.source = 'shellcheck';
+                diagnostic.source = PackageInfo.diagnosticSource;
                 diagnostics.push(diagnostic);
                 log(`Added shellcheck diagnostic at line ${lineNumber + 1}: ${scCode} - ${message}`);
             }
@@ -142,7 +143,7 @@ function parseShellcheckOutput(document: vscode.TextDocument, output: string): v
                     vscode.DiagnosticSeverity.Error
                 );
                 diagnostic.code = 'shellcheck-error';
-                diagnostic.source = 'shellcheck';
+                diagnostic.source = PackageInfo.diagnosticSource;
                 diagnostics.push(diagnostic);
                 log(`Added shellcheck diagnostic at line ${lineNumber + 1}`);
             }

@@ -6,7 +6,7 @@
 import { spawn } from 'child_process';
 import * as path from 'path';
 import * as vscode from 'vscode';
-import { ConfigManager } from '../utils/extensionInfo';
+import { ConfigManager, PackageInfo } from '../utils/extensionInfo';
 import { log } from '../utils/logger';
 import { logShellCommandCloseOutput, logShellCommandErrorOutput } from '../utils/shell';
 import {
@@ -29,6 +29,9 @@ export function initializeFormatter(diagnosticCol: vscode.DiagnosticCollection):
  * @param options 格式化选项
  * @param token 取消令牌
  * @returns TextEdit 数组
+ *
+ * 使用shfmt格式化文档, 并返回格式化后的内容, 即使内容没有变化, 也会返回。
+ * 因此即使文档没有格式调整, 也会返回一个非空的TextEdit数组, 但是这会导致文件修改时间发生变化.
  */
 export async function formatDocument(
     document: vscode.TextDocument,
@@ -129,7 +132,7 @@ export async function formatDocument(
 
             const errorDiagnostic = createSpawnErrorDiagnostic(
                 document,
-                'shfmt',
+                PackageInfo.diagnosticSource,
                 fullCommand,
                 err
             );

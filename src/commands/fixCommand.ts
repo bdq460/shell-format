@@ -6,6 +6,7 @@
 import * as vscode from 'vscode';
 import { formatDocument } from '../formatters/documentFormatter';
 import { PackageInfo } from '../utils/extensionInfo';
+import { log } from '../utils/logger';
 
 /**
  * 注册修复所有问题命令
@@ -14,6 +15,9 @@ export function registerFixAllCommand(): vscode.Disposable {
     return vscode.commands.registerCommand(
         PackageInfo.commandFixAllProblems,
         async (uri?: vscode.Uri) => {
+
+            log(`Fix all problems command triggered! URI: ${uri}`);
+
             let document: vscode.TextDocument | undefined;
 
             if (uri) {
@@ -27,6 +31,7 @@ export function registerFixAllCommand(): vscode.Disposable {
             }
 
             if (document) {
+                log(`Fix all problems command triggered! Document: ${document.fileName}`);
                 const edits = await formatDocument(document);
                 if (edits && edits.length > 0) {
                     const edit = new vscode.WorkspaceEdit();
@@ -42,6 +47,8 @@ export function registerFixAllCommand(): vscode.Disposable {
                         'Shell script has formatting issues. Please check the Problems panel.'
                     );
                 }
+            } else {
+                log('Fix all problems command triggered! No document found');
             }
         }
     );

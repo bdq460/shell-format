@@ -70,7 +70,7 @@ export async function checkFormat(document: vscode.TextDocument): Promise<vscode
 
             const errorDiagnostic = createSpawnErrorDiagnostic(
                 document,
-                'shfmt',
+                PackageInfo.diagnosticSource,
                 fullCommand,
                 err
             );
