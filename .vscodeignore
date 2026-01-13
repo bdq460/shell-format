@@ -10,14 +10,11 @@ node_modules/**
 **/*.map
 **/*.ts
 
-# 开发文档（排除）
-doc/developer/**
-doc/packaging/**
-doc/configuration/**
+# 测试相关
+test/**
 
-# 用户文档（保留）
-doc/user/**
-doc/tools/**
+# 开发文档
+doc/**
 
 # 根目录文档
 PROJECT_SUMMARY.md    # 开发文档，排除

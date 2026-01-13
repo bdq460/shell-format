@@ -52,6 +52,18 @@
                     "default": "shfmt",
                     "description": "Path to shfmt executable"
                 },
+                "shell-format.tabSize": {
+                    "type": [
+                        "number",
+                        "enum"
+                    ],
+                    "enum": [
+                        "vscode",
+                        "ignore"
+                    ],
+                    "default": "vscode",
+                    "description": "Indentation size: number for spaces or 'tab' for tabs (used with shfmt -i/-tabs), value can be one of [vscode, ignore] or number. vscode:use vscode tab size, ignore: ignore tab check and format.default is vscode"
+                },
                 "shell-format.logOutput": {
                     "type": "string",
                     "enum": [
@@ -100,13 +112,16 @@
         ]
     },
     "scripts": {
+        "package:extension": "npx @vscode/vsce package && npm run clean",
+        "install:extension": "npm run package:extension && code --install-extension $(ls shell-format-*.vsix) --extensions-dir ~/.vscode/extensions",
         "vscode:prepublish": "npm run compile && npm run copy-readme",
+        "clean": "rm -rf dist/*",
         "compile": "tsc -p ./",
         "watch": "tsc -watch -p ./",
-        "pretest": "npm run compile && npm run lint",
+        "pretest": "npm run compile",
         "lint": "eslint src --ext ts",
-        "test": "node ./out/test/runTest.js",
-        "copy-readme": "cp doc/user/README.md README.md"
+        "test": "node test/run.js",
+        "copy-readme": "cp doc/user/README_EN.md README.md"
     },
     "devDependencies": {
         "@types/node": "^18.0.0",

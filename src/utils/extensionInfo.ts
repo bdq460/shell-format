@@ -3,6 +3,7 @@
  * 统一管理从 package.json 读取的配置信息
  */
 
+import { log } from 'console';
 import * as vscode from 'vscode';
 import * as packageJson from '../../package.json';
 
@@ -193,10 +194,10 @@ export class PackageInfo {
 
     /**
      * 获取 shfmt 的默认参数
-     * @returns shfmt 的默认参数数组，如 ['-i', '2', '-bn', '-ci', '-sr']
+     * @returns shfmt 的默认参数数组，如 ['-i', '2', '-bn', '-ci', '-sr'] 或 ['-tabs', '-bn', '-ci', '-sr']
      */
     static get defaultShfmtArgs(): string[] {
-        return ['-i', '2', '-bn', '-ci', '-sr'];
+        return ['-bn', '-ci', '-sr']
     }
 
     /**
@@ -218,6 +219,20 @@ export class PackageInfo {
         return configProperties?.[`${PackageInfo.extensionName}.onError` as keyof typeof configProperties]?.default
             || 'showProblem';
     }
+
+    /**
+     * 获取默认的 tab 缩进配置
+     * @returns 默认的 tab 缩进配置，数字或 'ignore'
+     * - 数字：使用指定数量的空格进行缩进
+     * - 'vscode'：使用 VSCode 的缩进配置
+     * - 'ignore'：忽略缩进配置
+     * 默认值为 'vscode'
+     */
+    static get defaultTabSize(): number | string {
+        const configProperties = packageJson.contributes?.configuration?.properties;
+        return configProperties?.[`${PackageInfo.extensionName}.tabSize` as keyof typeof configProperties]?.default
+            || "vscode";
+    }
 }
 
 /**
@@ -226,6 +241,7 @@ export class PackageInfo {
  * 提供对 VSCode 工作区配置的统一访问接口，支持：
  * - shfmt 可执行文件路径配置
  * - shfmt 参数配置（支持字符串和数组两种格式）
+ * - tab 缩进配置（数字空格或 tab 字符）
  * - 错误处理方式配置
  * - 配置变更检测
  *
@@ -262,22 +278,21 @@ export class ConfigManager {
         return config.get<string>('shfmtPath', PackageInfo.defaultShfmtPath);
     }
 
-    // ==================== shfmt 参数配置 ====================
-    /**
-     * 获取 shfmt 参数（数组格式）
-     *
-     * 这是推荐的参数配置方式，参数以数组形式提供
-     *
-     * @returns shfmt 的参数数组，如 ["-i", "2", "-bn", "-ci", "-sr"]
-     */
-    static getShfmtArgs(): string[] | undefined {
-        return PackageInfo.defaultShfmtArgs;
-    }
-
     // ==================== log 配置 ====================
     static getLogOutput(): string | undefined {
         const config = this.getConfig();
         return config.get<string>('logOutput', PackageInfo.defaultLogOutput);
+    }
+
+    // ==================== tabSize 配置 ====================
+
+    /**
+     * 获取 tab 缩进配置
+     * @returns tab 缩进配置：数字表示空格数，字符串 'tab' 表示使用 tab 字符
+     */
+    static getTabSize(): number | string {
+        const config = this.getConfig();
+        return config.get<number | string>('tabSize', PackageInfo.defaultTabSize);
     }
 
     // ==================== 错误处理配置 ====================
@@ -301,29 +316,30 @@ export class ConfigManager {
     /**
      * 构建 shfmt 参数列表
      *
-     * 按优先级顺序组合参数：
-     * 1. 优先使用字符串格式配置 (flag)
-     * 2. 其次使用数组格式配置 (args)
-     * 3. 最后使用默认参数
-     *
-     * 注意：会自动过滤掉 '-w' 参数，因为该参数用于原地写入文件，而插件使用标准输入输出
+     * 1. 不包括 '-w' 参数，因为该参数用于原地写入文件，而插件使用标准输入输出
+     * 2. tab 缩进配置优先使用用户配置，否则使用默认值, 默认值为 'vscode', 即使用vscode的缩进配置
      *
      * @returns 完整的 shfmt 参数数组
      */
     static buildShfmtArgs(): string[] {
-        const args: string[] = [];
-        const userArgs = this.getShfmtArgs();
 
-        if (userArgs && userArgs.length > 0) {
-            // 使用数组格式的参数
-            const validFlags = userArgs.filter(f => !f.includes('-w'));
-            args.push(...validFlags);
-        } else {
-            // 使用默认参数
-            args.push(...PackageInfo.defaultShfmtArgs);
+        const tabSetting = this.getTabSize();
+        if (tabSetting === 'ignore') {
+            return PackageInfo.defaultShfmtArgs;
+        } else if (typeof tabSetting === 'number' && tabSetting >= 0) {
+            // 使用空格缩进
+            return ['-i', tabSetting.toString(), ...PackageInfo.defaultShfmtArgs];
         }
-
-        return args;
+        // 设置为 'vscode'或其他未知值, 默认使用 vscode 缩进
+        if (tabSetting !== 'vscode') {
+            log(`Invalid tabSize setting: ${tabSetting}, using vscode tabSize instead. tabSize should be a number or one of 'vscode', 'ignore'.`);
+        }
+        const vscodeTabSize = vscode.workspace.getConfiguration('editor').get<string>('tabSize');
+        // 如果 vscode 没有配置缩进，则使用默认值
+        if (vscodeTabSize === undefined) {
+            return PackageInfo.defaultShfmtArgs;
+        }
+        return ['-i', vscodeTabSize, ...PackageInfo.defaultShfmtArgs];
     }
 
     // ==================== 配置变更检测 ====================
@@ -339,4 +355,5 @@ export class ConfigManager {
     static isConfigurationChanged(event: vscode.ConfigurationChangeEvent): boolean {
         return event.affectsConfiguration(this.configSection);
     }
+
 }
