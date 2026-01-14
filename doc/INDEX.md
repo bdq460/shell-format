@@ -17,7 +17,7 @@
 
 ### 🔧 工具参考
 
-- [shellcheck 使用指南](tools/shellcheck.md) - shellcheck 工具说明
+- [shellcheck 使用指南](tools/shell/shellcheck.md) - shellcheck 工具说明
 - [shfmt 使用指南](tools/shfmt.md) - shfmt 工具说明
 - [spawn 使用指南](tools/spawn.md) - Node.js spawn API 使用
 
@@ -45,7 +45,7 @@
 
 | 文档 | 目标读者 | 场景 |
 |-----|---------|------|
-| [shellcheck.md](tools/shellcheck.md) | 开发者和用户 | 了解 shellcheck 工具 |
+| [shellcheck.md](tools/shell/shellcheck.md) | 开发者和用户 | 了解 shellcheck 工具 |
 | [shfmt.md](tools/shfmt.md) | 开发者和用户 | 了解 shfmt 工具 |
 | [spawn.md](tools/spawn.md) | 开发者 | 了解 Node.js spawn API |
 

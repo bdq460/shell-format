@@ -3,7 +3,7 @@
  */
 
 import { ExecutionResult } from '../../executor';
-import { ToolResult, SyntaxError, FormatIssue } from '../types';
+import { SyntaxError, ToolResult } from '../../types';
 
 /**
  * 解析 shfmt 输出

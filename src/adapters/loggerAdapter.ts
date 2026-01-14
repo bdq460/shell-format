@@ -2,7 +2,7 @@
  * 适配日志系统到基础层接口
  */
 
-import { Logger } from '../executor';
+import { Logger } from '../tools/executor';
 import { log } from '../utils/logger';
 
 /**

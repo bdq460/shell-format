@@ -4,9 +4,9 @@
  */
 
 import * as vscode from 'vscode';
-import { ShfmtTool } from '../tools/shfmt';
-import { ShellcheckTool } from '../tools/shellcheck';
 import { DiagnosticAdapter, LoggerAdapter } from '../adapters';
+import { ShellcheckTool } from '../tools/shell/shellcheck';
+import { ShfmtTool } from '../tools/shell/shfmt';
 import { ConfigManager, PackageInfo } from '../utils/extensionInfo';
 import { log } from '../utils/logger';
 import { createSpawnErrorDiagnostic } from '../utils/spawnErrorHandler';

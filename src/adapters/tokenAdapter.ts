@@ -3,13 +3,13 @@
  */
 
 import * as vscode from 'vscode';
-import { CancellationToken } from '../executor';
+import { CancellationToken } from '../tools/executor';
 
 /**
  * VSCode 取消令牌适配器
  */
 export class VSCodeTokenAdapter implements CancellationToken {
-    constructor(private vscodeToken: vscode.CancellationToken) {}
+    constructor(private vscodeToken: vscode.CancellationToken) { }
 
     get isCancellationRequested(): boolean {
         return this.vscodeToken.isCancellationRequested;

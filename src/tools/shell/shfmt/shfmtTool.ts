@@ -4,7 +4,7 @@
  */
 
 import { execute, Logger } from '../../executor';
-import { ToolResult } from '../types';
+import { ToolResult } from '../../types';
 import { parseShfmtOutput } from './parser';
 
 /**
@@ -92,4 +92,4 @@ export interface ShfmtFormatOptions {
 /**
  * shfmt 检查选项
  */
-export interface ShfmtCheckOptions extends ShfmtFormatOptions {}
+export interface ShfmtCheckOptions extends ShfmtFormatOptions { }

@@ -5,8 +5,8 @@
 
 import * as path from 'path';
 import * as vscode from 'vscode';
-import { ShfmtTool } from '../tools/shfmt';
 import { DiagnosticAdapter, FormatterAdapter, LoggerAdapter } from '../adapters';
+import { ShfmtTool } from '../tools/shell/shfmt';
 import { ConfigManager, PackageInfo } from '../utils/extensionInfo';
 import { log } from '../utils/logger';
 import { createSpawnErrorDiagnostic } from '../utils/spawnErrorHandler';

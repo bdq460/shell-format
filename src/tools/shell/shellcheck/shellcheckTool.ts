@@ -3,7 +3,7 @@
  */
 
 import { execute, Logger } from '../../executor';
-import { ToolResult } from '../types';
+import { ToolResult } from '../../types';
 import { parseShellcheckOutput } from './parser';
 
 /**

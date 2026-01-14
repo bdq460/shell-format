@@ -3,7 +3,7 @@
  */
 
 import { ExecutionResult } from '../../executor';
-import { ToolResult, LinterIssue } from '../types';
+import { LinterIssue, ToolResult } from '../../types';
 
 /**
  * 解析 shellcheck 输出
