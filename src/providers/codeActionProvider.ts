@@ -48,7 +48,7 @@ export class ShellFormatCodeActionProvider implements vscode.CodeActionProvider 
 
         // 检查是否有来自本扩展的诊断
         const matchingDiagnostics = documentDiagnostics.filter(
-            d => d.source === PackageInfo.diagnosticSource
+            (d: vscode.Diagnostic) => d.source === PackageInfo.diagnosticSource
         );
 
         // 如果没有来自本扩展的诊断问题，则不提供任何操作

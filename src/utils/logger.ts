@@ -59,3 +59,30 @@ export function disposeLogger(): void {
         log('Output channel disposed');
     }
 }
+
+/**
+ * 输出shell命令执行结果
+ * @param fullCommand 完整的命令
+ * @param stdout 标准输出
+ * @param stderr 错误输出
+ * @param code 命令执行返回码
+ */
+
+export function logShellCommandCloseOutput(fullCommand: string, stdout: Buffer[], stderr: Buffer[], code: number | null): void {
+    const stdoutStr = Buffer.concat(stdout).toString();
+    const stderrStr = Buffer.concat(stderr).toString();
+    log(`Command execute complete! command: ${fullCommand}\nreturnCode: ${code}\nStdout: ${stdoutStr}\nStderr: ${stderrStr}`);
+}
+
+/**
+ * 输出shell命令执行错误信息
+ * @param fullCommand 完整的命令
+ * @param stdout 标准输出
+ * @param stderr 错误输出
+ * @param err 错误对象
+ */
+export function logShellCommandErrorOutput(fullCommand: string, stdout: Buffer[], stderr: Buffer[], err: NodeJS.ErrnoException): void {
+    const stdoutStr = Buffer.concat(stdout).toString();
+    const stderrStr = Buffer.concat(stderr).toString();
+    log(`Command execute error! command: ${fullCommand}\nStdout: ${stdoutStr}\nStderr: ${stderrStr}, err: ${err}`);
+}
