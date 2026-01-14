@@ -53,7 +53,7 @@ export function registerFixAllCommand(): vscode.Disposable {
                 await vscode.workspace.applyEdit(edit);
                 // 显示成功消息
                 vscode.window.showInformationMessage(
-                    `[${PackageInfo.extensionName}]: all problems fixed successfully`
+                    "All problems fixed successfully."
                 );
             } else if (edits && edits.length === 0) {
                 log('No formatting fixes return.');
@@ -62,7 +62,7 @@ export function registerFixAllCommand(): vscode.Disposable {
                 if (hasDiagnostics) {
                     log('No formatting fixes needed, but diagnostics found.');
                     vscode.window.showWarningMessage(
-                        `[${PackageInfo.extensionName}]: shell script has formatting issues. Please check the Problems panel.`
+                        `Formatting failed with warnings. Check the Problems panel.`
                     );
                 } else {
                     log('No formatting fixes needed.');

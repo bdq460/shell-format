@@ -3,18 +3,17 @@
  * 提供文档格式化功能
  */
 
-import { spawn } from 'child_process';
 import * as path from 'path';
 import * as vscode from 'vscode';
+import { ShfmtTool } from '../tools/shfmt';
+import { DiagnosticAdapter, FormatterAdapter, LoggerAdapter } from '../adapters';
 import { ConfigManager, PackageInfo } from '../utils/extensionInfo';
 import { log } from '../utils/logger';
-import { logShellCommandCloseOutput, logShellCommandErrorOutput } from '../utils/shell';
-import {
-    createSpawnErrorDiagnostic,
-    formatErrorLogMessage
-} from '../utils/spawnErrorHandler';
+import { createSpawnErrorDiagnostic } from '../utils/spawnErrorHandler';
 
 let diagnosticCollection: vscode.DiagnosticCollection;
+const shfmtTool = new ShfmtTool();
+const loggerAdapter = new LoggerAdapter();
 
 /**
  * 初始化格式化器
@@ -26,157 +25,99 @@ export function initializeFormatter(diagnosticCol: vscode.DiagnosticCollection):
 /**
  * 格式化文档
  * @param document 文档对象
- * @param options 格式化选项
+ * @param _options 格式化选项（未使用，由 shfmt 内部处理）
  * @param token 取消令牌
  * @returns TextEdit 数组
  *
- * 使用shfmt格式化文档, 并返回格式化后的内容, 即使内容没有变化, 也会返回。
- * 因此即使文档没有格式调整, 也会返回一个非空的TextEdit数组, 但是这会导致文件修改时间发生变化.
+ * 使用 shfmt 格式化文档, 并返回格式化后的内容
  */
 export async function formatDocument(
     document: vscode.TextDocument,
-    options?: vscode.FormattingOptions,
-    token?: vscode.CancellationToken
+    _options?: vscode.FormattingOptions,
+    _token?: vscode.CancellationToken
 ): Promise<vscode.TextEdit[]> {
     const fileName = path.basename(document.fileName);
+    const content = document.getText();
+
     log(`Start format document: ${fileName}`);
 
-    const shfmtPath = ConfigManager.getShfmtPath();
-    const args = ConfigManager.buildShfmtArgs();
-    const content = document.getText();
-    const fullCommand = `${shfmtPath} ${args.join(' ')} ${fileName}`;
-    log(`Execute command: ${fullCommand}`);
+    try {
+        const formatOptions = {
+            commandPath: ConfigManager.getShfmtPath(),
+            indent: getIndentSize(),
+            binaryNextLine: true,
+            caseIndent: true,
+            spaceRedirects: true,
+            logger: loggerAdapter
+        };
 
-    return new Promise((resolve, reject) => {
-        if (token?.isCancellationRequested) {
-            log(`Formatting cancelled for: ${fileName}`);
-            reject(new vscode.CancellationError());
-            return;
+        const result = await shfmtTool.format(content, formatOptions);
+
+        // 格式化失败，创建诊断
+        if (!result.success && result.syntaxErrors) {
+            log(`Format failed with syntax errors`);
+
+            const diagnostics = DiagnosticAdapter.convert(
+                result,
+                document,
+                PackageInfo.diagnosticSource
+            );
+
+            // 获取已有诊断并合并
+            const existingDiagnostics = diagnosticCollection.get(document.uri) || [];
+            const allDiagnostics = [...existingDiagnostics, ...diagnostics];
+            diagnosticCollection.set(document.uri, allDiagnostics);
+
+            return [];
         }
 
-        const shfmt = spawn(shfmtPath, args);
-        const stdout: Buffer[] = [];
-        const stderr: Buffer[] = [];
+        // 格式化成功，清除诊断并返回 TextEdit
+        diagnosticCollection.delete(document.uri);
+        return FormatterAdapter.convert(result, document);
 
-        shfmt.stdout.on('data', (chunk) => {
-            stdout.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
-        });
+    } catch (error) {
+        // 处理执行错误（如进程启动失败）
+        if (error instanceof Error) {
+            const shfmtPath = ConfigManager.getShfmtPath();
+            const args = ConfigManager.buildShfmtArgs();
+            const fullCommand = `${shfmtPath} ${args.join(' ')} ${fileName}`;
 
-        shfmt.stderr.on('data', (chunk) => {
-            stderr.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
-        });
-
-        shfmt.on('close', (code) => {
-
-            logShellCommandCloseOutput(fullCommand, stdout, stderr, code);
-
-            // 一般情况下shfmt -i 2 -bn -ci -sr执行格式化操作后, 无论是否有格式调整, 都会返回0的退出码
-            // 通过stdout判断是否有格式修改
-            // 1. 如果有格式调整, 则stdout不为空, 返回格式化后的内容
-            // 2. 如果没有格式调整, 则stdout为空, 返回原内容
-            //
-            // 在一些情况下使用shfmt进行文件格式化操作的时候
-            // 如果脚本代码存在语法错误，shfmt会返回非0的退出码，同时输出错误信息到stderr
-            //
-            // 如对于以下代码, 其if条件没有闭合:
-            //  ```shell
-            //      if [ "x" = "x" ]
-            //         echo "missing then"
-            //  ```
-            //
-            // 执行命令:
-            // ```shell
-            //  shfmt -i 2 -bn -ci -sr test_syntax.sh.git
-            // ```
-            //
-            // shfmt会返回非0的退出码，同时输出错误信息到stderr。
-            // 输出如下:
-            // ```text
-            //  returnCode: 1
-            //  Stdout:
-            //  Stderr: <standard input >: 16: 9: reached EOF without matching { with }
-            // ```
-            //
-            // 对于这时发现的错误, 按道理应该也在diagnostic中显示, 要求用户修复
-            // 但是由于shellcheck也会进行语法检查, 其检查结果会覆盖shfmt格式化时发现的语法错误
-            // 当文件内容变化时就会触发文件合规检测, 其中就包括了shellcheck的检查.
-            // 因此不会存丢失shfmt进行format操作时发现的问题.
-            // 所以这里只对shfmt成功执行格式化的情况进行处理, 对返回code非0的情况不做处理,仅做记录处理.
-
-            const stdoutStr = Buffer.concat(stdout).toString();
-            const stderrStr = Buffer.concat(stderr).toString();
-
-            if (code === 0) {
-                // 检查是否有 stderr 输出（部分格式化错误）
-                if (stderrStr.length > 0) {
-                    log(`Format completed with warnings: ${stderrStr}`);
-                    // 创建诊断显示错误信息
-                    const diagnostic = new vscode.Diagnostic(
-                        new vscode.Range(0, 0, 0, 0),
-                        stderrStr,
-                        vscode.DiagnosticSeverity.Warning
-                    );
-                    diagnostic.source = PackageInfo.diagnosticSource;
-                    diagnosticCollection.set(document.uri, [diagnostic]);
-                    resolve([]);
-                    return;
-                }
-
-                log(`File well formatted. file:${fileName}`);
-
-                // 比较格式化前后的内容，只有内容变化时才返回 TextEdit
-                if (stdoutStr === content) {
-                    log('Content unchanged, no edits needed');
-                    resolve([]);
-                    return;
-                }
-
-                const fullRange = new vscode.Range(
-                    document.positionAt(0),
-                    document.positionAt(document.getText().length)
-                );
-
-                diagnosticCollection.delete(document.uri);
-                // 返回替换整个文档的 TextEdit
-                // vscode会使用 TextEdit 替换整个文档
-                resolve([vscode.TextEdit.replace(fullRange, stdoutStr)]);
-            } else {
-                log(`Found format errors. file:${fileName}, stderrStr: ${stderrStr}`);
-                log('Returning empty edits due to format errors');
-                resolve([]);
-            }
-        });
-
-        shfmt.on('error', (err: NodeJS.ErrnoException) => {
-
-            logShellCommandErrorOutput(fullCommand, stdout, stderr, err);
-
-            const errorMessage = formatErrorLogMessage('shfmt', err);
-            log(`${errorMessage}\nCommand: ${fullCommand}`);
+            log(`Format error: ${error.message}`);
 
             const errorDiagnostic = createSpawnErrorDiagnostic(
                 document,
                 PackageInfo.diagnosticSource,
                 fullCommand,
-                err
+                error as NodeJS.ErrnoException
             );
 
             if (errorDiagnostic) {
                 diagnosticCollection.set(document.uri, [errorDiagnostic]);
-                log(`Created diagnostic for shfmt formatting error at line 0`);
             }
+        }
 
-            reject(err);
-        });
+        return [];
+    }
+}
 
-        shfmt.stdin.write(content);
-        shfmt.stdin.end();
+/**
+ * 获取缩进大小
+ */
+function getIndentSize(): number | undefined {
+    const tabSetting = ConfigManager.getTabSize();
 
-        token?.onCancellationRequested(() => {
-            log(`Killing shfmt process for: ${fileName}`);
-            shfmt.kill();
-        });
-    });
+    if (tabSetting === 'ignore') {
+        return undefined;
+    } else if (typeof tabSetting === 'number' && tabSetting >= 0) {
+        return tabSetting;
+    }
+
+    // 使用 VSCode 缩进配置
+    if (tabSetting !== 'vscode') {
+        log(`Invalid tabSize setting: ${tabSetting}, using vscode tabSize instead`);
+    }
+    const vscodeTabSize = vscode.workspace.getConfiguration('editor').get<string>('tabSize');
+    return vscodeTabSize ? parseInt(vscodeTabSize, 10) : undefined;
 }
 
 /**

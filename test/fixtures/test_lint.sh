@@ -15,6 +15,5 @@ if [ "$name" = "Klein" ]; then
     echo "你好，Klein"
 
 
-if
 # 调用函数
-hello "World".
+hello         "World".

@@ -1,7 +1,7 @@
 {
     "name": "shell-format",
-    "displayName": "Shell format with shell-shfmt",
-    "description": "Format shell scripts with shellcheck and shfmt, show errors in 'Problems' plate",
+    "displayName": "Shell Format",
+    "description": "Intelligent Shell script formatting and error checking fixing with shfmt and shellcheck",
     "version": "1.0.0",
     "publisher": "bdq460",
     "icon": "icon.png",
