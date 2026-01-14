@@ -4,6 +4,41 @@
 
 Shell Format 是一个基于 VSCode 扩展 API 的 Shell 脚本格式化和诊断工具。本文档详细说明项目的架构设计、技术选型和实现细节。
 
+> **注意**：本文档专注于项目架构设计。关于 VSCode Extension API 的详细说明，请参考 [extension-api.md](../vscode/extension-api.md)。
+
+## 核心概念
+
+### 诊断集合 (DiagnosticCollection)
+
+用于集中管理 Shell 脚本的格式化和语法检查诊断信息。详细 API 说明请参考 [../vscode/extension-api.md](../tools/vscode.md)。
+
+### 文档过滤
+
+跳过特殊文件（如 Git 冲突文件、临时文件），避免对非目标文件进行诊断和格式化。
+
+**跳过模式**：
+
+| 模式 | 说明 | 示例 |
+|-----|------|------|
+| `/\.git$/` | Git 冲突文件 | `example.sh.git` |
+| `/\.swp$/` | Vim 临时文件 | `file.sh.swp` |
+| `/\.swo$/` | Vim 交换文件 | `file.sh.swo` |
+| `/~$/` | 备份文件 | `file.sh~` |
+| `/\.tmp$/` | 临时文件 | `file.sh.tmp` |
+| `/\.bak$/` | 备份文件 | `file.sh.bak` |
+
+**示例代码**：
+
+```typescript
+function shouldSkipFile(fileName: string): boolean {
+    const baseName = path.basename(fileName);
+    const skipPatterns = [
+        /\.git$/, /\.swp$/, /\.swo$/, /~$/, /\.tmp$/, /\.bak$/
+    ];
+    return skipPatterns.some(pattern => pattern.test(baseName));
+}
+```
+
 ## 设计原则
 
 ### 1. 模块化设计
@@ -86,7 +121,7 @@ export function activate(context: vscode.ExtensionContext) {
     initializeFormatter(diagnosticCollection);
 
     // 4. 注册提供者
-    const formatProvider = vscode.languages.registerDocumentFormattingEditProvider(...);
+    const formatProvider = vscode.languages.registerDocumentRangeFormattingEditProvider(...);
     const codeActionProvider = vscode.languages.registerCodeActionsProvider(...);
 
     // 5. 注册命令
@@ -96,6 +131,7 @@ export function activate(context: vscode.ExtensionContext) {
     const saveListener = vscode.workspace.onDidSaveTextDocument(...);
     const openListener = vscode.workspace.onDidOpenTextDocument(...);
     const changeListener = vscode.workspace.onDidChangeTextDocument(...);
+    const configListener = vscode.workspace.onDidChangeConfiguration(...);
 
     // 7. 清理资源
     context.subscriptions.push(
@@ -105,6 +141,7 @@ export function activate(context: vscode.ExtensionContext) {
         saveListener,
         openListener,
         changeListener,
+        configListener,
         diagnosticCollection
     );
 }
@@ -128,7 +165,7 @@ export function activate(context: vscode.ExtensionContext) {
 ```tree
 commands/
 ├── index.ts              # 注册所有命令
-├── formatCommand.ts      # 格式化命令
+├── formatCommand.ts      # 格式化命令（已废弃，使用格式化 Provider）
 └── fixCommand.ts         # 修复命令
 ```
 
@@ -148,6 +185,8 @@ vscode.commands.registerCommand()
 VSCode 应用编辑
 ```
 
+> 有关命令和 CodeAction 的详细 API 说明，请参考 [../vscode/extension-api.md](../vscode/extension-api.md)。
+
 ### 3. 诊断模块 (diagnostics/)
 
 **职责**：
@@ -155,6 +194,15 @@ VSCode 应用编辑
 - 调用外部工具检测问题
 - 解析工具输出
 - 生成 VSCode Diagnostic 对象
+
+**诊断触发时机**：
+
+| 触发条件 | 监听器 | 防抖 |
+|---------|--------|------|
+| 文档保存 | `onDidSaveTextDocument` | ❌ 否 |
+| 文档打开 | `onDidOpenTextDocument` | ❌ 否 |
+| 文档变化 | `onDidChangeTextDocument` | ✅ 是（500ms） |
+| 配置变更 | `onDidChangeConfiguration` | ❌ 否 |
 
 **文件结构**：
 
@@ -202,6 +250,23 @@ const allDiagnostics = [
 diagnosticCollection.set(document.uri, allDiagnostics);
 ```
 
+**防抖实现**：
+
+```typescript
+let debounceTimer: NodeJS.Timeout | undefined;
+
+function debounceDiagnose(document: vscode.TextDocument, delay: number = 500): void {
+    if (debounceTimer) {
+        clearTimeout(debounceTimer);
+    }
+    debounceTimer = setTimeout(() => {
+        diagnoseDocument(document);
+    }, delay);
+}
+```
+
+> 有关防抖机制的详细说明，请参考 [../vscode/extension-api.md](../vscode/extension-api.md)。
+
 ### 4. 格式化模块 (formatters/)
 
 **职责**：
@@ -210,22 +275,11 @@ diagnosticCollection.set(document.uri, allDiagnostics);
 - 调用 shfmt 执行格式化
 - 返回格式化后的 TextEdit
 
-**工作流程**：
+**文件结构**：
 
-```flow
-用户触发格式化
-    ↓
-provideDocumentFormattingEdits()
-    ↓
-spawn('shfmt', args)
-    ↓
-写入文档内容到 stdin
-    ↓
-读取 stdout 获取格式化结果
-    ↓
-生成 TextEdit
-    ↓
-返回给 VSCode 应用
+```tree
+formatters/
+└── documentFormatter.ts  # 文档格式化实现
 ```
 
 **关键实现**：
@@ -273,6 +327,26 @@ export async function formatDocument(
 }
 ```
 
+> 有关 DocumentRangeFormattingEditProvider 和 DocumentFormattingEditProvider 的详细说明，请参考 [../vscode/extension-api.md](../vscode/extension-api.md)。
+
+**工作流程**：
+
+```flow
+用户触发格式化
+    ↓
+provideDocumentRangeFormattingEdits()
+    ↓
+spawn('shfmt', args)
+    ↓
+写入文档内容到 stdin
+    ↓
+读取 stdout 获取格式化结果
+    ↓
+生成 TextEdit
+    ↓
+返回给 VSCode 应用
+```
+
 ### 5. 提供者模块 (providers/)
 
 **职责**：
@@ -280,12 +354,19 @@ export async function formatDocument(
 - 提供 Code Action（快速修复）
 - 处理用户的修复请求
 
+**文件结构**：
+
+```tree
+providers/
+└── codeActionProvider.ts  # Code Action 提供者实现
+```
+
 **工作流程**：
 
 ```flow
 VSCode 检测到问题
     ↓
-提供 Code ActionProvider
+提供 CodeActionProvider
     ↓
 用户点击黄色灯泡
     ↓
@@ -338,6 +419,8 @@ export class ShellFormatCodeActionProvider
     }
 }
 ```
+
+> 有关 CodeActionProvider、QuickFix 和 SourceFixAll 的详细说明，请参考 [../vscode/extension-api.md](../vscode/extension-api.md)。
 
 ### 6. 工具模块 (utils/)
 
@@ -422,8 +505,18 @@ export class ConfigManager {
         const config = vscode.workspace.getConfiguration('shell-format');
         return config.get<string>('logOutput', 'off');
     }
+
+    static isConfigurationChanged(event: vscode.ConfigurationChangeEvent): boolean {
+        // 检查配置是否变化
+        if (event.affectsConfiguration('shell-format')) {
+            return true;
+        }
+        return false;
+    }
 }
 ```
+
+> 有关配置管理的详细 API 说明，请参考 [../vscode/extension-api.md](../vscode/extension-api.md)。
 
 ## 关键设计模式
 
@@ -442,6 +535,8 @@ VSCode 使用 Provider 模式来扩展编辑器功能：
 - 解耦扩展实现和 VSCode 核心
 - 提供一致的扩展接口
 - 便于测试和维护
+
+> 有关 Provider 模式的详细说明，请参考 [../vscode/extension-api.md](../vscode/extension-api.md)。
 
 ### 2. 事件驱动模式
 
@@ -468,7 +563,16 @@ const changeListener = vscode.workspace.onDidChangeTextDocument(event => {
         debounceDiagnose(event.document);
     }
 });
+
+// 配置变更时触发
+const configListener = vscode.workspace.onDidChangeConfiguration(event => {
+    if (isConfigurationChanged(event)) {
+        diagnoseAllDocuments();
+    }
+});
 ```
+
+> 有关事件监听的详细说明，请参考 [../vscode/extension-api.md](../vscode/extension-api.md)。
 
 ### 3. 防抖模式 (Debounce)
 
@@ -494,6 +598,8 @@ function debounceDiagnose(document: vscode.TextDocument, delay: number = 500): v
 时间轴:   |----|--|---|---------> 500ms
 诊断触发:                        ✓ (只在D之后500ms触发一次)
 ```
+
+> 有关防抖机制的详细说明，请参考 [../vscode/extension-api.md](../vscode/extension-api.md)。
 
 ### 4. Promise 封装模式
 
@@ -571,6 +677,8 @@ export async function formatDocument(
     // ...
 }
 ```
+
+> 有关 CancellationToken 的详细说明，请参考 [../vscode/extension-api.md](../vscode/extension-api.md)。
 
 ## 错误处理
 
@@ -677,6 +785,8 @@ export class ConfigManager {
 }
 ```
 
+> 有关配置管理的详细 API 说明，请参考 [../vscode/extension-api.md](../vscode/extension-api.md)。
+
 ## 测试策略
 
 ### 1. 单元测试
@@ -708,3 +818,8 @@ Shell Format 采用模块化、可扩展的架构设计，通过清晰的模块�
 - ✅ 关注点分离，职责清晰
 - ✅ 异步执行，不阻塞 UI
 - ✅ 完善的错误处理和日志系统
+
+**相关文档**：
+
+- [../vscode/extension-api.md](../vscode/extension-api.md) - VSCode 扩展开发 API 详细说明
+- [package.json](../../package.json) - 扩展配置文件

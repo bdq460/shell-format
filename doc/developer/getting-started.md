@@ -250,7 +250,7 @@ log('Result: success');
 完成快速开始后，建议:
 
 1. 阅读 [架构设计文档](architecture.md) 了解项目架构
-2. 阅读 [package.json 配置说明](../configuration/package-json.md) 了解扩展配置
+2. 阅读 [package.json 配置说明](../vscode/package-json.md) 了解扩展配置
 3. 阅读 [spawn 使用指南](../tools/spawn.md) 了解如何调用外部命令
 4. 查看 [源代码](../../src/) 了解具体实现
 
@@ -270,6 +270,6 @@ log('Result: success');
 
 - [开发者快速入门](README.md)
 - [架构设计文档](architecture.md)
-- [package.json 配置说明](../configuration/package-json.md)
+- [package.json 配置说明](../vscode/package-json.md)
 - [spawn 使用指南](../tools/spawn.md)
 - [VSCode 扩展开发文档](https://code.visualstudio.com/api)

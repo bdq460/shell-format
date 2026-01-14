@@ -7,8 +7,8 @@
 ```json
 {
   "name": "shell-format",                    // 扩展唯一标识符
-  "displayName": "Shell Format with shfmt",   // 显示名称
-  "description": "...",                      // 扩展描述
+  "displayName": "Shell format with shell-shfmt",   // 显示名称
+  "description": "Format shell scripts with shellcheck and shfmt, show errors in 'Problems' plate",  // 扩展描述
   "version": "1.0.0",                         // 版本号（遵循 semver）
   "publisher": "bdq460",                     // 发布者名称（需在 VSCode Marketplace 注册）
   "icon": "icon.png",                         // 扩展图标路径
@@ -18,7 +18,7 @@
   "categories": ["Formatters", "Linters"],    // 扩展分类
   "repository": {                             // 代码仓库信息
     "type": "git",
-    "url": "https://github.com/..."
+    "url": "https://github.com/bdq460/shell-format.git"
   }
 }
 ```
@@ -30,10 +30,12 @@
 ```json
 "activationEvents": [
   "onLanguage:shellscript",                  // 打开 shell 脚本时激活
-  "onCommand:shell-format.formatDocument",    // 执行特定命令时激活
-  "onCommand:shell-format.fixAllProblems",   // 执行特定命令时激活
+  "onCommand:shell-format.fixAllProblems"     // 执行修复所有问题命令时激活
 ]
 ```
+
+**说明**：
+- 移除了 `onCommand:shell-format.formatDocument`，因为注册了 `DocumentRangeFormattingEditProvider` 后，VSCode 的默认格式化命令已经足够，无需额外注册命令。
 
 ## 主入口 (main)
 
@@ -84,21 +86,21 @@
       "default": "shfmt",
       "description": "Path to shfmt executable"
     },
+    "shell-format.tabSize": {
+      "type": ["number", "string"],
+      "enum": ["vscode", "ignore"],
+      "default": "vscode",
+      "description": "Indentation size: number for spaces or 'tab' for tabs (used with shfmt -i/-tabs), value can be one of [vscode, ignore] or number. vscode: use vscode tab size, ignore: ignore tab check and format. default is vscode"
+    },
     "shell-format.logOutput": {
         "type": "string",
-        "enum": [
-            "off",
-            "on"
-        ],
+        "enum": ["off", "on"],
         "default": "off",
         "description": "Output log information to console and output window! value can be one of [off, on]. default is off"
     },
     "shell-format.onError": {
         "type": "string",
-        "enum": [
-            "showProblem",
-            "ignore"
-        ],
+        "enum": ["showProblem", "ignore"],
         "default": "showProblem",
         "description": "How to handle shfmt errors"
     }
@@ -106,84 +108,100 @@
 }
 ```
 
+**配置说明**：
+
+| 配置项 | 类型 | 默认值 | 说明 |
+|--------|------|--------|------|
+| `shellcheckPath` | string | `shellcheck` | shellcheck 可执行文件路径 |
+| `shfmtPath` | string | `shfmt` | shfmt 可执行文件路径 |
+| `tabSize` | number 或 string | `vscode` | 缩进大小：数字表示空格数，`vscode` 使用 VSCode 配置，`ignore` 忽略缩进检查 |
+| `logOutput` | string | `off` | 日志输出：`on` 输出到控制台和输出窗口，`off` 关闭 |
+| `onError` | string | `showProblem` | 错误处理：`showProblem` 在问题面板显示，`ignore` 忽略错误 |
+
 ### 3. 命令 (commands)
 
-定义命令, 所定义的命令由命令面板、快捷键触发, 全局，不依赖代码问题, 需主动执行。
+定义命令，所定义的命令由命令面板、快捷键触发，全局，不依赖代码问题，需主动执行。
 
 ```json
 "commands": [
   {
-    "command": "shell-format.formatDocument",  // 命令 ID
-    "title": "Format Document"                // 显示标题
+    "command": "shell-format.formatDocument",
+    "title": "Format document with shell-format"
+  },
+  {
+    "command": "shell-format.fixAllProblems",
+    "title": "Fix all problems with shell-format"
   }
 ]
 ```
 
-注意：这里只是声明命令, 需要通过 vscode.commands.registerCommand() 注册命令及命令实现, 才能使命令可用
+**注意**：
+1. 这里只是声明命令，需要通过 `vscode.commands.registerCommand()` 注册命令及命令实现，才能使命令可用
+2. `shell-format.formatDocument` 命令虽然声明了，但因为注册了 `DocumentRangeFormattingEditProvider`，VSCode 的默认格式化命令已经足够，可以不额外注册此命令的实现
+3. `shell-format.fixAllProblems` 命令必须注册实现，用于修复所有问题
 
 ```JavaScript
 // 注册命令
-const formatDocumentCommand = vscode.commands.registerCommand(
-    'shell-format.formatDocument',
-    () => {
-        // 格式化文档的逻辑
+const fixAllCommand = vscode.commands.registerCommand(
+    'shell-format.fixAllProblems',
+    async (uri: vscode.Uri) => {
+        // 修复所有问题的逻辑
+        const document = await vscode.workspace.openTextDocument(uri);
+        await formatDocument(document);
     }
 );
 ```
 
-使用方式
+**使用方式**：
 
-- 命令面板输入 "Format Document" 或 "Fix All Problems"
+- 命令面板输入 "Format document with shell-format" 或 "Fix all problems with shell-format"
 - 可以绑定快捷键
-- 可以在代码中通过 vscode.commands.executeCommand() 调用
+- 可以在代码中通过 `vscode.commands.executeCommand()` 调用
 
 ### 4. 代码操作 (codeActions)
 
-定义代码操作, 所定义的代码操作通过点击灯泡图标执行, 仅在有代码问题时显示, 主要针对问题修复
-
-kind：操作类型，source.fixAll 表示自动修复类型，shell-format 是扩展自定义的标识
-title：显示给用户的操作名称
-languages：在哪些语言文件中显示此操作
+定义代码操作，所定义的代码操作通过点击灯泡图标执行，仅在有代码问题时显示，主要针对问题修复。
 
 ```json
 "codeActions": [
   {
-    "kind": "source.fixAll.shell-format",    // 动作类型
-    "title": "Fix all with shfmt",           // 显示标题
-    "languages": ["shellscript"]             // 支持的语言
+    "kind": "quickfix.shell-format",
+    "title": "Fix this issue with shell-format",
+    "languages": ["shellscript"]
+  },
+  {
+    "kind": "source.fixAll.shell-format",
+    "title": "Fix all problems with shell-format",
+    "languages": ["shellscript"]
   }
 ]
 ```
 
-注意, 这里只是声明action, 需要通过 vscode.languages.registerCodeActionsProvider() 注册代码操作提供者, 才能使代码操作可用
+**属性说明**：
 
-```JavaScript
-// 注册代码操作提供者
-const codeActionProvider = vscode.languages.registerCodeActionsProvider(
-    'shellscript',
-    {
-        provideCodeActions(document, range, context, token) {
-            // 返回修复操作
-            const actions = [];
-            actions.push({
-                title: 'Fix all with shfmt',
-                kind: 'source.fixAll.shell-format',
-                command: {
-                    command: 'shell-format.fixAllProblems',
-                    title: 'Fix all with shfmt'
-                }
-            });
-            return actions;
-        }
-    }
-);
-```
+| 属性 | 说明 |
+|-----|------|
+| `kind` | 操作类型：`quickfix` 修复单个问题，`source.fixAll` 修复所有问题 |
+| `title` | 显示给用户的操作名称 |
+| `languages` | 在哪些语言文件中显示此操作 |
 
-使用方式：
+**注意**：这里只是声明 action，需要通过 `vscode.languages.registerCodeActionsProvider()` 注册代码操作提供者，才能使代码操作可用。
 
-- 当 VSCode 检测到问题时，会在代码编辑器左侧显示黄色灯泡
-- 点击灯泡后显示 "Fix all with shfmt" 选项
-- 选中后执行修复操作
+**QuickFix vs SourceFixAll**：
+
+| 特性 | QuickFix | SourceFixAll |
+|-----|----------|--------------|
+| 用途 | 修复特定的、局部的问题 | 修复整个文档的所有问题 |
+| 触发方式 | 灯泡图标、右键菜单 | 保存时（`editor.codeActionsOnSave`） |
+| 是否需要自定义子类型 | ❌ 否 | ✅ 是（如 `.append('shell-format')`） |
+| 配置支持 | 不支持 `codeActionsOnSave` | 支持 `codeActionsOnSave` |
+
+**完整流程**：
+
+1. 用户打开一个 Shell 脚本文件
+2. 发现问题 → 代码左侧显示黄色灯泡
+3. 点击灯泡 → 显示 "Fix this issue with shell-format" (quickfix) 和 "Fix all problems with shell-format" (source.fixAll)
+4. 选择修复 → 执行 `shell-format.fixAllProblems` 命令
 
 #### 完整的用户体验流程
 
@@ -198,16 +216,33 @@ const codeActionProvider = vscode.languages.registerCodeActionsProvider(
 
 ```json
 "scripts": {
-  "vscode:prepublish": "npm run compile",    // 发布前执行, 自动触发（VSCode 命令）
-  "compile": "tsc -p ./",                    // 编译 TypeScript
-  "watch": "tsc -watch -p ./",               // 监听模式编译
-  "pretest": "npm run compile && npm run lint",  // 测试前执行
-  "lint": "eslint src --ext ts",             // 代码检查
-  "test": "node ./test/runTest.js"       // 运行测试
+  "package:extension": "npx @vscode/vsce package && npm run clean",
+  "install:extension": "npm run package:extension && code --install-extension $(ls shell-format-*.vsix) --extensions-dir ~/.vscode/extensions",
+  "vscode:prepublish": "npm run compile && npm run copy-readme",
+  "clean": "rm -rf dist/*",
+  "compile": "tsc -p ./",
+  "watch": "tsc -watch -p ./",
+  "pretest": "npm run compile",
+  "lint": "eslint src --ext ts",
+  "test": "node test/run.js",
+  "copy-readme": "cp doc/user/README_EN.md README.md"
 }
 ```
 
-运行方式为 `npm run <script>`
+**脚本说明**：
+
+| 脚本 | 说明 |
+|-----|------|
+| `package:extension` | 打包扩展为 VSIX 文件 |
+| `install:extension` | 打包并安装扩展到本地 VSCode |
+| `vscode:prepublish` | 发布前自动执行（编译 + 复制 README） |
+| `clean` | 清理编译输出目录 |
+| `compile` | 编译 TypeScript |
+| `watch` | 监听模式编译 |
+| `pretest` | 测试前执行 |
+| `lint` | 代码检查 |
+| `test` | 运行测试 |
+| `copy-readme` | 复制英文 README 到根目录（用于发布） |
 
 **注意**：`scripts` 字段不会包含在打包文件中，仅在开发和构建阶段使用。
 

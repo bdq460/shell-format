@@ -11,8 +11,9 @@
 - [根目录 README.md](../README.md) - 项目概述、架构设计、开发指南
 - [快速开始指南](developer/getting-started.md) - 开发环境配置和上手
 - [架构设计文档](developer/architecture.md) - 详细的架构设计说明
-- [package.json 配置说明](configuration/package-json.md) - 扩展配置详解
-- [language-configuration.json 详解](configuration/language-configuration.md) - 语言配置说明
+- [VSCode 扩展 API 参考](vscode/extension-api.md) - VSCode 扩展开发 API 详细说明
+- [package.json 配置说明](vscode/package-json.md) - 扩展配置详解
+- [language-configuration.json 详解](vscode/language-configuration.md) - 语言配置说明
 
 ### 🔧 工具参考
 
@@ -36,8 +37,9 @@
 | [../README.md](../README.md) | 开发者 | 项目概述、核心设计、开发指南 |
 | [getting-started.md](developer/getting-started.md) | 新加入项目的开发者 | 快速搭建开发环境 |
 | [architecture.md](developer/architecture.md) | 需要理解架构的开发者 | 了解项目架构设计 |
-| [package-json.md](configuration/package-json.md) | 需要修改配置的开发者 | 了解 package.json 配置 |
-| [language-configuration.md](configuration/language-configuration.md) | 需要修改语言配置的开发者 | 了解语言配置文件 |
+| [extension-api.md](vscode/extension-api.md) | VSCode 扩展开发者 | VSCode 扩展 API 详细说明 |
+| [package-json.md](vscode/package-json.md) | 需要修改配置的开发者 | 了解 package.json 配置 |
+| [language-configuration.md](vscode/language-configuration.md) | 需要修改语言配置的开发者 | 了解语言配置文件 |
 
 ### 工具文档
 
@@ -55,7 +57,7 @@
 | `user/` | ✅ | 用户文档打包到扩展中 |
 | `tools/` | ✅ | 工具文档打包到扩展中 |
 | `developer/` | ❌ | 开发者文档不打包 |
-| `configuration/` | ❌ | 配置文档不打包 |
+| `vscode/` | ❌ | VSCode 文档不打包 |
 | `INDEX.md` | ❌ | 文档索引不打包 |
 
 ## 文档说明
