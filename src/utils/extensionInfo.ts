@@ -106,10 +106,10 @@ export class PackageInfo {
      * 获取格式化文档的命令ID
      * @returns 格式化文档命令的完整ID
      */
-    static get commandFormatDocument(): string {
-        return packageJson.contributes?.commands?.find((c: Command) => c.command?.includes('formatDocument'))?.command
-            || 'shell-format.formatDocument';
-    }
+    // static get commandFormatDocument(): string {
+    //     return packageJson.contributes?.commands?.find((c: Command) => c.command?.includes('formatDocument'))?.command
+    //         || 'shell-format.formatDocument';
+    // }
 
     /**
      * 获取修复所有问题的命令ID
@@ -352,7 +352,15 @@ export class ConfigManager {
      * @returns 如果变更影响当前扩展返回 true，否则返回 false
      */
     static isConfigurationChanged(event: vscode.ConfigurationChangeEvent): boolean {
-        return event.affectsConfiguration(this.configSection);
+        // 监听本插件的配置变化
+        if (event.affectsConfiguration(this.configSection)) {
+            return true;
+        }
+        // 只有当 shellformat.tabSize 设置为 'vscode' 时，才需要监听 editor.tabSize 变化
+        if (this.getTabSize() === 'vscode' && event.affectsConfiguration('editor.tabSize')) {
+            return true;
+        }
+        return false;
     }
 
 }

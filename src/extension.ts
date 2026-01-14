@@ -7,7 +7,7 @@ import * as path from 'path';
 import * as vscode from 'vscode';
 import { registerAllCommands } from './commands';
 import { diagnoseAllShellScripts, diagnoseDocument, initializeDiagnostics } from './diagnostics';
-import { formatDocument, formatDocumentRange, initializeFormatter } from './formatters/documentFormatter';
+import { formatDocumentRange, initializeFormatter } from './formatters/documentFormatter';
 import { ShellFormatCodeActionProvider } from './providers/codeActionProvider';
 import { ConfigManager, PackageInfo } from './utils/extensionInfo';
 import { disposeLogger, initializeLogger, log } from './utils/logger';
@@ -45,12 +45,13 @@ export function activate(context: vscode.ExtensionContext) {
     log('Extension is now active');
 
     // 初始化日志
+    log('Start initialize logger');
     initializeLogger();
 
     // 创建诊断集合
     //
     // 什么是 DiagnosticCollection？
-    //  DiagnosticCollection 是 VSCode 提供的用于管理诊断信息（错误、警告、提示）的 API。
+    // DiagnosticCollection 是 VSCode 提供的用于管理诊断信息（错误、警告、提示）的 API。
     //
     // DiagnosticCollection 的作用
     //  - 显示诊断信息：在编辑器中显示错误、警告、提示
@@ -67,36 +68,64 @@ export function activate(context: vscode.ExtensionContext) {
     const diagnosticCollection = vscode.languages.createDiagnosticCollection(PackageInfo.extensionName);
 
     // 初始化各模块
+    log('Initialize diagnostics')
     initializeDiagnostics(diagnosticCollection);
+
+    log('Initialize formatter')
     initializeFormatter(diagnosticCollection);
 
     // 注册文档格式化提供者
+    // 通过快捷键,或命令面板中或选中代码后的右键菜单中调用Format Document 命令时调用会触发注册的函数
+    //
     // DocumentFormattingEditProvider 接口用于提供文档格式化功能
-    // 当用户从命令面板或右键菜单选择"格式化文档(Format Document)"或"格式化选定内容(Format Selection)"时
-    // VSCode 会调用 provideDocumentFormattingEdits() 方法
+    //
+    // 触发条件：
+    //  快捷键: 用户按下格式化文档快捷键（默认是 Cmd + Shift + F / Ctrl + Shift + F）
+    //  命令面板: 用户从命令面板选择"格式化文档"
+    //  保存时: 如果配置了 editor.formatOnSave
+    //  粘贴时: 如果配置了 editor.formatOnPaste
+    //  输入时: 如果配置了 editor.formatOnType
+    //  自动保存: 文件自动保存时触发
+    //
+    // 格式化结果应用:
     // provideDocumentFormattingEdits() 方法返回一个 TextEdit[]，表示格式化后的文本
     // vscode会自动应用这些编辑更新原始文档
-    log('Registering document formatting provider');
-    const formatProvider = vscode.languages.registerDocumentFormattingEditProvider(
-        PackageInfo.languageId,
-        {
-            provideDocumentFormattingEdits(
-                document: vscode.TextDocument,
-                options: vscode.FormattingOptions,
-                token: vscode.CancellationToken
-            ): vscode.ProviderResult<vscode.TextEdit[]> {
-                // 跳过特殊文件
-                if (shouldSkipFile(document.fileName)) {
-                    log(`Skipping formatting for: ${document.fileName} (special file)`);
-                    return [];
-                }
-                log(`Document formatting triggered for: ${document.fileName}`);
-                return formatDocument(document, options, token);
-            }
-        }
-    );
+    //
+    // 注意:
+    //  Note: A document range provider is also a document formatter which means there is no need to register a document formatter when also registering a range provider.
+    //  注意：文档范围提供者也同时是文档格式化提供者，因此当注册范围提供者时不需要单独注册格式化提供者。
+
+    //  因此如果调用registerDocumentRangeFormattingEditProvider注册了范围提供者:
+    //  1. 不需要再registerDocumentFormattingEditProvider
+    //  2. 不需要再注册shell-format.formatDocument命令, 因为默认格式化命令已经可以满足格式化需求
+    // log('Registering document formatting provider');
+    // const formatProvider = vscode.languages.registerDocumentFormattingEditProvider(
+    //     PackageInfo.languageId,
+    //     {
+    //         provideDocumentFormattingEdits(
+    //             document: vscode.TextDocument,
+    //             options: vscode.FormattingOptions,
+    //             token: vscode.CancellationToken
+    //         ): vscode.ProviderResult<vscode.TextEdit[]> {
+    //             log(`Document formatting triggered! Document: ${document.fileName}`);
+    //             // 跳过特殊文件
+    //             if (shouldSkipFile(document.fileName)) {
+    //                 log(`Skipping formatting for: ${document.fileName} (special file)`);
+    //                 return [];
+    //             }
+    //             return formatDocument(document, options, token);
+    //         }
+    //     }
+    // );
 
     // 注册文档范围格式化提供者（用于格式化选中文本）
+    // 通过选中代码后, 从命令面板或右键菜单选择"格式化选中文本(Format Selection)"时调用会触发注册的函数
+    //
+    // DocumentRangeFormattingEditProvider 接口用于提供文档范围格式化功能
+    // 当用户从命令面板或右键菜单选择"格式化选中文本(Format Selection)"时
+    // VSCode 会调用 provideDocumentRangeFormattingEdits() 方法
+    // provideDocumentRangeFormattingEdits() 方法返回一个 TextEdit[]，表示格式化后的文本
+    // vscode会自动应用这些编辑更新原始文档
     log('Registering document range formatting provider');
     const rangeFormatProvider = vscode.languages.registerDocumentRangeFormattingEditProvider(
         PackageInfo.languageId,
@@ -107,6 +136,7 @@ export function activate(context: vscode.ExtensionContext) {
                 options: vscode.FormattingOptions,
                 token: vscode.CancellationToken
             ): vscode.ProviderResult<vscode.TextEdit[]> {
+                log(`Document range formatting triggered! Document: ${document.fileName}, range: [${range.start.line}, ${range.start.character}] - [${range.end.line}, ${range.end.character}]`);
                 // 跳过特殊文件
                 if (shouldSkipFile(document.fileName)) {
                     log(`Skipping range formatting for: ${document.fileName} (special file)`);
@@ -118,7 +148,52 @@ export function activate(context: vscode.ExtensionContext) {
         }
     );
 
-    // 注册 Code Actions 提供者
+    // 注册 Code Actions 类型提供者
+    // 1. PackageInfo.languageId,: 绑定特定语言
+    // 2. CodeActionProvider的作用: 绑定Code Actions与具体执行命令名称(注意不是实现,只绑定是命令名称)
+    // 3. providedCodeActionKinds: 声明支持的 Code Actions 类型, 用于过滤哪些 Code Actions 类型需要调用你的 provider
+    //    - QuickFix 类型：修复单个问题
+    //    - SourceFixAll 类型：修复所有问题
+    //
+    // CodeActionProvider的作用
+    // 当触发特定动作时, VSCode会调用CodeActionProvider的provideCodeActions()方法,返回所有绑定了具体执行命令名称的CodeAction，
+    //
+    // 触发时机
+    // VS Code 会在以下情况调用 provideCodeActions：
+    // 1. 右键点击代码 → 显示上下文菜单
+    // 2. 点击灯泡图标 💡 → 显示快速修复选项
+    // 3. 按 Cmd +. / Ctrl +. → 显示快速修复面板
+    // 4. 保存文件时（如果配置了 editor.codeActionsOnSave）
+    // 5. 编辑器焦点变化时（VS Code 可能会预先获取）
+    //
+    // providedCodeActionKinds 的作用
+    // providedCodeActionKinds 的作用是过滤，不是绑定实现。
+    // 1. 性能优化 - 避免不必要的调用, 当用户触发 CodeAction 时，VSCode 会询问所有注册的 CodeActionProvider。
+    //    通过设置 providedCodeActionKinds 可以减少不必要的计算。
+    //    * 如果不设置providedCodeActionKinds
+    //      - 当用户点击灯泡图标时, VSCode调用所有provider→你的provider被调用→返回所有 action
+    //    * 如果设置了providedCodeActionKinds[QuickFix]
+    //      - 用户保存文件时 → VS Code 只请求 SourceFixAll → 跳过你的 provider
+    //      - 用户右键点击 → VS Code 请求 QuickFix → 调用你的 provider
+    // 2. 过滤 - 精确匹配配置
+    //    当用户配置了 editor.codeActionsOnSave：
+    //    {
+    //      "editor.codeActionsOnSave": {
+    //      "source.fixAll": "explicit",
+    //        "source.fixAll.shell-format": "always"
+    //    }
+    //    VS Code 会：
+    //      - 只调用声明了 providedCodeActionKinds: [..., SourceFixAll] 的 provider
+    //      - 过滤掉没有声明 SourceFixAll 的 provider
+    // 3. 工作流程示例
+    //    假设有两个扩展：
+    //     - Extension A: providedCodeActionKinds: [QuickFix]
+    //     - Extension B(你的): providedCodeActionKinds: [QuickFix, SourceFixAll.append('shell-format')]
+    //
+    //    |用户操作|调用A|	调用你的扩展|
+    //    | :-----: | :--: | :-------: |
+    //    |保存文件（请求 SourceFixAll|✗|✓|
+    //    |保存文件（请求 SourceFixAll.shell - format|✗|✓|
     //
     // QuickFix 和 SourceFixAll 的区别
     //
@@ -127,7 +202,7 @@ export function activate(context: vscode.ExtensionContext) {
     //  - 触发方式：在代码中右键或按 Cmd +.时显示的灯泡菜单
     //  - 不需要自定义子类型，因为它不通过 codeActionsOnSave 触发
     //
-    // vscode.CodeActionKind.SourceFixAll
+    // vscode.CodeActionKind.SourceFixAll.${PackageInfo.extensionName}
     //   - 用途：修复整个文档的所有问题
     //   - 触发方式：通过 editor.codeActionsOnSave 配置在保存时自动执行
     //   - 需要自定义子类型（如.append('shell-format')），这样才能在 codeActionsOnSave 中精确控制
@@ -135,16 +210,12 @@ export function activate(context: vscode.ExtensionContext) {
     // 为什么不需要给 QuickFix append？
     // 1. QuickFix 不在 codeActionsOnSave 中使用
     //    editor.codeActionsOnSave 只支持 SourceFixAll 类型的 CodeAction，不支持 QuickFix 类型。
-    // 2. QuickFix 是用户手动触发的
+    // 2. QuickFix 是用户手动触发的, 此时不需要区分是哪个扩展的 QuickFix，因为用户已经选中了文档或问题。
     //    当你在代码上看到错误提示时：
     //    - 点击灯泡图标 💡
     //    - 或按 Cmd +. / Ctrl +.
     //
-    // VS Code 会调用 provideCodeActions() 方法，返回所有的 CodeAction，包括：
-    //  - QuickFix 类型：修复单个问题
-    //  - SourceFixAll 类型：修复所有问题
-    // 此时不需要区分是哪个扩展的 QuickFix，因为用户会自己选择。
-    log('Registering code actions provider');
+    log('Registering code actions provider!');
     const codeActionProvider = vscode.languages.registerCodeActionsProvider(
         PackageInfo.languageId,
         new ShellFormatCodeActionProvider(),
@@ -157,6 +228,7 @@ export function activate(context: vscode.ExtensionContext) {
     );
 
     // 注册所有命令
+    // 绑定命令名称和具体实现
     log('Registering commands');
     const commands = registerAllCommands();
 
@@ -164,6 +236,7 @@ export function activate(context: vscode.ExtensionContext) {
     log('Registering document save listener');
     const saveListener = vscode.workspace.onDidSaveTextDocument(
         async (document) => {
+            log(`Document save happened, trigger diagnoseDocument for: ${document.fileName}`);
             if (document.languageId === PackageInfo.languageId) {
                 // 跳过特殊文件
                 if (shouldSkipFile(document.fileName)) {
@@ -180,13 +253,13 @@ export function activate(context: vscode.ExtensionContext) {
     log('Registering document open listener');
     const openListener = vscode.workspace.onDidOpenTextDocument(
         async (document) => {
+            log(`Document open happened, trigger diagnoseDocument for: ${document.fileName}`);
             if (document.languageId === PackageInfo.languageId) {
                 // 跳过特殊文件
                 if (shouldSkipFile(document.fileName)) {
                     log(`Skipping open diagnosis for: ${document.fileName} (special file)`);
                     return;
                 }
-                log(`Document opened: ${document.fileName}`);
                 await diagnoseDocument(document);
             }
         }
@@ -196,28 +269,33 @@ export function activate(context: vscode.ExtensionContext) {
     log('Registering document change listener');
     const changeListener = vscode.workspace.onDidChangeTextDocument(
         async (event) => {
+            log(`Document change happened, trigger debounceDiagnose for: ${event.document.fileName}`);
             if (event.document.languageId === PackageInfo.languageId) {
                 // 跳过特殊文件
                 if (shouldSkipFile(event.document.fileName)) {
                     log(`Skipping change diagnosis for: ${event.document.fileName} (special file)`);
                     return;
                 }
-                log(`Document changed: ${event.document.fileName}`);
                 debounceDiagnose(event.document);
             }
         }
     );
 
     // 监听配置变化
+    // 监听配置变化时重新诊断所有 shell 脚本
+    // onDidChangeConfiguration会监听配置变化, 包括用户settings.json或工作区.vscode/settings.json所有配置变化
     log('Registering configuration change listener');
     const configChangeListener = vscode.workspace.onDidChangeConfiguration(async (event) => {
+        log(`Configuration change event happend!event:${event}`);
+        // 当修改涉及本插件的配置时, 才需要重新诊断所有 shell 脚本
         if (ConfigManager.isConfigurationChanged(event)) {
-            log('Configuration changed, re-diagnosing...');
+            log('Extension related configuration changed, re-diagnosing all shell scripts');
             diagnoseAllShellScripts();
         }
     });
 
-    // 诊断所有打开的 shell 脚本
+    // 安装插件后, 自动诊断所有打开的 shell 脚本
+    // 这是为了确保用户在安装插件后, 能够立即看到所有 shell 脚本的诊断结果
     log('Diagnosing all open shell scripts');
     diagnoseAllShellScripts();
 
@@ -233,7 +311,7 @@ export function activate(context: vscode.ExtensionContext) {
     //  - 重新加载窗口（Reload Window）
     //  - 卸载扩展
     context.subscriptions.push(
-        formatProvider,
+        // formatProvider,
         rangeFormatProvider,
         codeActionProvider,
         ...commands,
@@ -254,6 +332,7 @@ export function activate(context: vscode.ExtensionContext) {
  *   诊断触发:                       ✓ (只在D之后500ms触发一次)
  */
 function debounceDiagnose(document: vscode.TextDocument, delay: number = 500): void {
+    log(`Debouncing diagnose for: ${document.fileName}`);
     if (debounceTimer) {
         // 清除之前的定时器，避免重复触发, 确保只有最后一次触发产生的定时器可以保留下来
         clearTimeout(debounceTimer);
@@ -274,12 +353,12 @@ function debounceDiagnose(document: vscode.TextDocument, delay: number = 500): v
 export function deactivate() {
     log('Extension is now deactivated');
 
-    // 清理日志输出通道
-    disposeLogger();
-
     // 清理防抖定时器
     if (debounceTimer) {
         clearTimeout(debounceTimer);
         log('Debounce timer cleared');
     }
+
+    // 清理日志输出通道
+    disposeLogger();
 }

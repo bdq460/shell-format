@@ -58,6 +58,7 @@ export async function diagnoseDocument(document: vscode.TextDocument): Promise<v
  * 诊断所有打开的 Shell 脚本
  */
 export function diagnoseAllShellScripts(): void {
+    log('Starting diagnosis for all open shell scripts');
     vscode.workspace.textDocuments.forEach((document) => {
         if (document.languageId === 'shellscript') {
             diagnoseDocument(document);

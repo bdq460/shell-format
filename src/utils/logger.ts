@@ -13,6 +13,7 @@ let outputChannel: vscode.OutputChannel;
  * 初始化日志输出通道
  */
 export function initializeLogger(): void {
+    log('Initialize logger');
     if (ConfigManager.getLogOutput() === 'off') {
         return;
     }
@@ -52,6 +53,7 @@ export function getOutputChannel(): vscode.OutputChannel {
  * 销毁日志输出通道
  */
 export function disposeLogger(): void {
+    log('Dispose logger');
     if (outputChannel) {
         outputChannel.dispose();
         log('Output channel disposed');

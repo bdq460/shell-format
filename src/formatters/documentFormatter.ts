@@ -39,7 +39,7 @@ export async function formatDocument(
     token?: vscode.CancellationToken
 ): Promise<vscode.TextEdit[]> {
     const fileName = path.basename(document.fileName);
-    log(`Starting format for: ${fileName}`);
+    log(`Start format document: ${fileName}`);
 
     const shfmtPath = ConfigManager.getShfmtPath();
     const args = ConfigManager.buildShfmtArgs();
@@ -104,9 +104,33 @@ export async function formatDocument(
             // 所以这里只对shfmt成功执行格式化的情况进行处理, 对返回code非0的情况不做处理,仅做记录处理.
 
             const stdoutStr = Buffer.concat(stdout).toString();
-            if (code === 0) {
+            const stderrStr = Buffer.concat(stderr).toString();
 
-                log(`File well format. file:${fileName}`);
+            if (code === 0) {
+                // 检查是否有 stderr 输出（部分格式化错误）
+                if (stderrStr.length > 0) {
+                    log(`Format completed with warnings: ${stderrStr}`);
+                    // 创建诊断显示错误信息
+                    const diagnostic = new vscode.Diagnostic(
+                        new vscode.Range(0, 0, 0, 0),
+                        stderrStr,
+                        vscode.DiagnosticSeverity.Warning
+                    );
+                    diagnostic.source = PackageInfo.diagnosticSource;
+                    diagnosticCollection.set(document.uri, [diagnostic]);
+                    resolve([]);
+                    return;
+                }
+
+                log(`File well formatted. file:${fileName}`);
+
+                // 比较格式化前后的内容，只有内容变化时才返回 TextEdit
+                if (stdoutStr === content) {
+                    log('Content unchanged, no edits needed');
+                    resolve([]);
+                    return;
+                }
+
                 const fullRange = new vscode.Range(
                     document.positionAt(0),
                     document.positionAt(document.getText().length)
@@ -117,7 +141,7 @@ export async function formatDocument(
                 // vscode会使用 TextEdit 替换整个文档
                 resolve([vscode.TextEdit.replace(fullRange, stdoutStr)]);
             } else {
-                log(`Found format errors. file:${fileName}, stdoutStr: ${stdoutStr}`);
+                log(`Found format errors. file:${fileName}, stderrStr: ${stderrStr}`);
                 log('Returning empty edits due to format errors');
                 resolve([]);
             }
@@ -173,10 +197,8 @@ export async function formatDocumentRange(
     options?: vscode.FormattingOptions,
     token?: vscode.CancellationToken
 ): Promise<vscode.TextEdit[]> {
-    const fileName = path.basename(document.fileName);
-    log(`Range formatting triggered for: ${fileName}, range: [${range.start.line}, ${range.start.character}] - [${range.end.line}, ${range.end.character}]`);
-    log('Note: Shell script formatting requires full document context, will format entire document');
-
+    log(`Start format document range for: ${document.fileName}, range: [${range.start.line}, ${range.start.character}] - [${range.end.line}, ${range.end.character}]`);
     // 直接调用 formatDocument，由 VSCode 自动裁剪选区内的变更
+    log('Note: Shell script formatting requires full document context, will format entire document');
     return formatDocument(document, options, token);
 }

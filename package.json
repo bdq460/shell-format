@@ -18,7 +18,6 @@
     ],
     "activationEvents": [
         "onLanguage:shellscript",
-        "onCommand:shell-format.formatDocument",
         "onCommand:shell-format.fixAllProblems"
     ],
     "main": "./dist/extension.js",

@@ -4,15 +4,17 @@
  */
 
 import * as vscode from 'vscode';
+import { log } from '../utils/logger';
 import { registerFixAllCommand } from './fixCommand';
-import { registerFormatCommand } from './formatCommand';
 
 /**
  * 注册所有命令
  */
 export function registerAllCommands(): vscode.Disposable[] {
+    log('Registering all commands');
     return [
-        registerFormatCommand(),
+        // 不需要注册格式化文档命令, extension.ts中注册了DocumentRangeFormattingEditProvider
+        // registerFormatCommand(),
         registerFixAllCommand()
     ];
 }
