@@ -4,19 +4,21 @@
  */
 
 import { spawn } from 'child_process';
-import { ExecutorOptions, ExecutionResult, Logger } from './types';
+import { ToolExecutionError } from '../errors';
+import { ExecutionResult, ExecutorOptions } from './types';
 
 /**
  * 通用进程执行器
  * 执行外部命令并返回结果
  */
 export async function execute(
+    command: string,
     options: ExecutorOptions,
-    logger?: Logger
 ): Promise<ExecutionResult> {
-    const { command, args, input, token } = options;
+    const { args, token, logger } = options;
+    const fullCommand = `${command} ${args.join(' ')}`;
 
-    logger?.info(`Executing: ${command} ${args.join(' ')}`);
+    logger?.info(`Executing: ${fullCommand}`);
 
     return new Promise((resolve, reject) => {
         if (token?.isCancellationRequested) {
@@ -38,21 +40,28 @@ export async function execute(
         });
 
         process.on('close', (code) => {
-            logger?.info(`Execution completed with code: ${code}`);
+            const stdoutStr = Buffer.concat(stdout).toString();
+            const stderrStr = Buffer.concat(stderr).toString();
+            logger?.info(`Execution completed with code: ${code}\nstdout: ${stdoutStr}\nstderr: ${stderrStr}`);
+
+            // 记录 stdout 和 stderr（始终记录）
+            // logger?.debug?.(`stdout: ${stdoutStr}`);
+            // logger?.debug?.(`stderr: ${stderrStr}`);
+
             resolve({
                 exitCode: code,
-                stdout: Buffer.concat(stdout).toString(),
-                stderr: Buffer.concat(stderr).toString()
+                stdout: stdoutStr,
+                stderr: stderrStr
             });
         });
 
         process.on('error', (err) => {
             logger?.error(`Execution error: ${err.message}`);
-            reject(err);
+            reject(new ToolExecutionError(
+                err as NodeJS.ErrnoException,
+                fullCommand
+            ));
         });
-
-        process.stdin.write(input);
-        process.stdin.end();
 
         token?.onCancellationRequested(() => {
             logger?.info('Killing process due to cancellation');

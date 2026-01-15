@@ -459,7 +459,7 @@ export function initializeLogger(): void {
     }
 }
 
-export function log(message: string): void {
+export function logger.info(message: string): void {
     const timestamp = new Date().toLocaleTimeString();
     const logMessage = `[${timestamp}] ${message}`;
 

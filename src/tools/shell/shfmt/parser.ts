@@ -14,7 +14,6 @@ import { SyntaxError, ToolResult } from '../../types';
  */
 export function parseShfmtOutput(
     result: ExecutionResult,
-    originalContent: string,
     mode: 'format' | 'check'
 ): ToolResult {
     // 成功：返回格式化内容

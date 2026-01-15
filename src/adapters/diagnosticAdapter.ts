@@ -3,7 +3,8 @@
  */
 
 import * as vscode from 'vscode';
-import { ToolResult, SyntaxError, FormatIssue, LinterIssue } from '../tools/types';
+import { ToolExecutionError } from '../tools/errors';
+import { LinterIssue, SyntaxError, ToolResult } from '../tools/types';
 
 /**
  * 诊断适配器
@@ -27,7 +28,7 @@ export class DiagnosticAdapter {
         // 语法错误
         if (result.syntaxErrors) {
             for (const error of result.syntaxErrors) {
-                diagnostics.push(this.createSyntaxError(error, document, source));
+                diagnostics.push(this.createSyntaxError(error, source));
             }
         }
 
@@ -39,7 +40,7 @@ export class DiagnosticAdapter {
         // Linter 问题
         if (result.linterIssues) {
             for (const issue of result.linterIssues) {
-                diagnostics.push(this.createLinterIssue(issue, document, source));
+                diagnostics.push(this.createLinterIssue(issue, source));
             }
         }
 
@@ -47,11 +48,35 @@ export class DiagnosticAdapter {
     }
 
     /**
+     * 创建工具执行错误诊断
+     * @param document 文档对象
+     * @param error 工具执行错误
+     * @returns 诊断对象
+     */
+    static createToolExecutionError(
+        document: vscode.TextDocument,
+        error: ToolExecutionError
+    ): vscode.Diagnostic {
+        // 在文件第一行显示错误
+        const lineRange = document.lineCount > 0 ? document.lineAt(0).range : new vscode.Range(0, 0, 0, 0);
+        const fullMessage = `${error.message}\n\nCommand: ${error.command}`;
+
+        const commandName = error.command.split(' ')[0];
+        const diagnostic = new vscode.Diagnostic(
+            lineRange,
+            fullMessage,
+            vscode.DiagnosticSeverity.Error
+        );
+        diagnostic.code = `${commandName}-execution-error`;
+        diagnostic.source = commandName;
+        return diagnostic;
+    }
+
+    /**
      * 创建语法错误诊断
      */
     private static createSyntaxError(
         error: SyntaxError,
-        document: vscode.TextDocument,
         source: string
     ): vscode.Diagnostic {
         const range = new vscode.Range(
@@ -100,7 +125,6 @@ export class DiagnosticAdapter {
      */
     private static createLinterIssue(
         issue: LinterIssue,
-        document: vscode.TextDocument,
         source: string
     ): vscode.Diagnostic {
         const range = new vscode.Range(
