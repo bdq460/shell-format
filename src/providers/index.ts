@@ -5,14 +5,17 @@
 
 import * as vscode from 'vscode';
 import { PackageInfo } from '../config';
-import { getDiagnosticCollection } from '../diagnostics';
 import { logger } from '../utils/log';
 
 /**
  * ShellFormat Code Action 提供者
  *
+ * @param diagnosticCollection VSCode 诊断集合
  */
 export class ShellFormatCodeActionProvider implements vscode.CodeActionProvider {
+    constructor(
+        private diagnosticCollection: vscode.DiagnosticCollection
+    ) { }
     /**
      * 提供 Code Actions
      * provideCodeActions 的调用机制
@@ -41,8 +44,7 @@ export class ShellFormatCodeActionProvider implements vscode.CodeActionProvider 
         logger.info(`context.diagnostics.length: ${context.diagnostics?.length}`);
 
         // 从 DiagnosticCollection 获取当前文档的所有诊断
-        const diagnosticCollection = getDiagnosticCollection();
-        const documentDiagnostics = diagnosticCollection.get(document.uri) || [];
+        const documentDiagnostics = this.diagnosticCollection.get(document.uri) || [];
 
         logger.info(`documentDiagnostics.length: ${documentDiagnostics.length}`);
 

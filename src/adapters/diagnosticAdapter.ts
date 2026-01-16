@@ -4,7 +4,7 @@
 
 import * as vscode from 'vscode';
 import { ToolExecutionError } from '../tools/errors';
-import { LinterIssue, SyntaxError, ToolResult } from '../tools/types';
+import { FormatIssue, LinterIssue, SyntaxError, ToolResult } from '../tools/types';
 
 /**
  * 诊断适配器
@@ -28,13 +28,15 @@ export class DiagnosticAdapter {
         // 语法错误
         if (result.syntaxErrors) {
             for (const error of result.syntaxErrors) {
-                diagnostics.push(this.createSyntaxError(error, source));
+                diagnostics.push(this.createSyntaxError(error, document, source));
             }
         }
 
         // 格式问题
         if (result.formatIssues) {
-            diagnostics.push(this.createFormatIssue(document, source));
+            for (const issue of result.formatIssues) {
+                diagnostics.push(this.createFormatIssue(issue, source));
+            }
         }
 
         // Linter 问题
@@ -67,8 +69,27 @@ export class DiagnosticAdapter {
             fullMessage,
             vscode.DiagnosticSeverity.Error
         );
-        diagnostic.code = `${commandName}-execution-error`;
         diagnostic.source = commandName;
+        diagnostic.code = `execution-error`;
+        return diagnostic;
+    }
+
+    static createFormatIssue(
+        issue: FormatIssue,
+        source: string
+    ): vscode.Diagnostic {
+        const range = new vscode.Range(
+            new vscode.Position(issue.line, issue.column),
+            new vscode.Position(issue.line, issue.column + issue.rangeLength)
+        );
+
+        const diagnostic = new vscode.Diagnostic(
+            range,
+            issue.message || '格式不正确',
+            vscode.DiagnosticSeverity.Warning
+        );
+        diagnostic.source = source;
+        diagnostic.code = `format-issue`;
         return diagnostic;
     }
 
@@ -77,14 +98,11 @@ export class DiagnosticAdapter {
      */
     private static createSyntaxError(
         error: SyntaxError,
+        document: vscode.TextDocument,
         source: string
     ): vscode.Diagnostic {
-        const range = new vscode.Range(
-            error.line,
-            error.column,
-            error.line,
-            error.column
-        );
+        // 使用文档行的实际范围，确保诊断能正确显示
+        const range = document.lineAt(error.line).range;
 
         const diagnostic = new vscode.Diagnostic(
             range,
@@ -92,30 +110,7 @@ export class DiagnosticAdapter {
             vscode.DiagnosticSeverity.Error
         );
         diagnostic.source = source;
-        diagnostic.code = `${source}-syntax-error`;
-
-        return diagnostic;
-    }
-
-    /**
-     * 创建格式问题诊断
-     */
-    private static createFormatIssue(
-        document: vscode.TextDocument,
-        source: string
-    ): vscode.Diagnostic {
-        const range = new vscode.Range(
-            document.positionAt(0),
-            document.positionAt(document.getText().length)
-        );
-
-        const diagnostic = new vscode.Diagnostic(
-            range,
-            'Shell script has formatting issues',
-            vscode.DiagnosticSeverity.Warning
-        );
-        diagnostic.source = source;
-        diagnostic.code = `${source}-format-issue`;
+        diagnostic.code = `syntax-error`;
 
         return diagnostic;
     }

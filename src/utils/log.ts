@@ -9,7 +9,11 @@ export let logger: Logger;
  * @param log 日志记录器
  */
 export function setLogger(log: Logger) {
-    logger = log;
+    console.log('Set logger');
+    if (!logger) {
+        console.log('logger is null set by param');
+        logger = log;
+    }
 }
 
 /**

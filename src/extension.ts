@@ -8,8 +8,8 @@ import * as vscode from 'vscode';
 import { initializeLoggerAdapter, LoggerAdapter } from './adapters/loggerAdapter';
 import { registerAllCommands } from './commands';
 import { PackageInfo, SettingInfo } from './config';
-import { diagnoseAllShellScripts, diagnoseDocument, initializeDiagnostics } from './diagnostics';
-import { formatDocument, initializeFormatter } from './formatters';
+import { diagnoseAllShellScripts, diagnoseDocument } from './diagnostics';
+import { formatDocument } from './formatters';
 import { ShellFormatCodeActionProvider } from './providers';
 import { logger } from './utils/log';
 
@@ -69,16 +69,6 @@ export function activate(context: vscode.ExtensionContext) {
     //  - 事件监听：内部可能有事件监听器
     logger.info('Diagnostic collection created');
     const diagnosticCollection = vscode.languages.createDiagnosticCollection(PackageInfo.extensionName);
-
-    // 初始化服务层（必须在初始化 diagnostics 和 formatter 之前）
-    logger.info('Initialize services');
-
-    // 初始化各模块
-    logger.info('Initialize diagnostics');
-    initializeDiagnostics(diagnosticCollection);
-
-    logger.info('Initialize formatter');
-    initializeFormatter(diagnosticCollection);
 
     // 注册文档格式化提供者
     // 通过快捷键,或命令面板中或选中代码后的右键菜单中调用Format Document 命令时调用会触发注册的函数
@@ -232,7 +222,7 @@ export function activate(context: vscode.ExtensionContext) {
     logger.info('Registering code actions provider!');
     const codeActionProvider = vscode.languages.registerCodeActionsProvider(
         PackageInfo.languageId,
-        new ShellFormatCodeActionProvider(),
+        new ShellFormatCodeActionProvider(diagnosticCollection),
         {
             providedCodeActionKinds: [
                 vscode.CodeActionKind.QuickFix,
@@ -244,7 +234,7 @@ export function activate(context: vscode.ExtensionContext) {
     // 注册所有命令
     // 绑定命令名称和具体实现
     logger.info('Registering commands');
-    const commands = registerAllCommands();
+    const commands = registerAllCommands(diagnosticCollection);
 
     // 监听文档保存时进行诊断
     logger.info('Registering document save listener');
@@ -260,7 +250,8 @@ export function activate(context: vscode.ExtensionContext) {
                 return;
             }
             logger.info(`Document saved: ${document.fileName}`);
-            await diagnoseDocument(document);
+            const diagnostics = await diagnoseDocument(document);
+            diagnosticCollection.set(document.uri, diagnostics);
         }
     );
 
@@ -277,7 +268,8 @@ export function activate(context: vscode.ExtensionContext) {
                 logger.info(`Skipping open diagnosis for: ${document.fileName} (special file)`);
                 return;
             }
-            await diagnoseDocument(document);
+            const diagnostics = await diagnoseDocument(document);
+            diagnosticCollection.set(document.uri, diagnostics);
         }
     );
 
@@ -295,7 +287,7 @@ export function activate(context: vscode.ExtensionContext) {
                 return;
             }
             logger.info(`Document change happened, trigger debounceDiagnose for: ${event.document.fileName}`);
-            debounceDiagnose(event.document);
+            debounceDiagnose(event.document, diagnosticCollection);
         }
     );
 
@@ -308,14 +300,25 @@ export function activate(context: vscode.ExtensionContext) {
         // 当修改涉及本插件的配置时, 才需要重新诊断所有 shell 脚本
         if (SettingInfo.isConfigurationChanged(event)) {
             logger.info('Extension related configuration changed, re-diagnosing all shell scripts');
-            diagnoseAllShellScripts();
+            const results = await diagnoseAllShellScripts();
+            results.forEach((diagnostics, uri) => {
+                diagnosticCollection.set(uri, diagnostics);
+            });
         }
     });
 
-    // 安装插件后, 自动诊断所有打开的 shell 脚本
+    // 安装插件后, 异步诊断所有打开的 shell 脚本
     // 这是为了确保用户在安装插件后, 能够立即看到所有 shell 脚本的诊断结果
-    logger.info('Diagnosing all open shell scripts');
-    diagnoseAllShellScripts();
+    // 注意：不等待结果，避免阻塞 activate 函数
+    logger.info('Starting background diagnosis for all open shell scripts');
+    diagnoseAllShellScripts().then(results => {
+        results.forEach((diagnostics, uri) => {
+            diagnosticCollection.set(uri, diagnostics);
+        });
+        logger.info('Background diagnosis completed');
+    }).catch(error => {
+        logger.error(`Background diagnosis failed: ${String(error)}`);
+    });
 
     // 退出时清理
     // 自动清理机制
@@ -348,15 +351,24 @@ export function activate(context: vscode.ExtensionContext) {
  * 用户输入:  A    B  C   D
  *   时间轴: |----|--|---|---------> 500ms
  *   诊断触发:                       ✓ (只在D之后500ms触发一次)
+ *
+ * @param document 文档对象
+ * @param diagnosticCollection VSCode 诊断集合
+ * @param delay 延迟时间（毫秒）
  */
-function debounceDiagnose(document: vscode.TextDocument, delay: number = 500): void {
+function debounceDiagnose(
+    document: vscode.TextDocument,
+    diagnosticCollection: vscode.DiagnosticCollection,
+    delay: number = 500
+): void {
     logger.info(`Debouncing diagnose for: ${document.fileName}`);
     if (debounceTimer) {
         // 清除之前的定时器，避免重复触发, 确保只有最后一次触发产生的定时器可以保留下来
         clearTimeout(debounceTimer);
     }
-    debounceTimer = setTimeout(() => {
-        diagnoseDocument(document);
+    debounceTimer = setTimeout(async () => {
+        const diagnostics = await diagnoseDocument(document);
+        diagnosticCollection.set(document.uri, diagnostics);
     }, delay);
 }
 

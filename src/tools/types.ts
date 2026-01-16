@@ -36,7 +36,12 @@ export interface SyntaxError {
  * 示例: 缩进混乱、空格不一致、换行位置不统一等
  */
 export interface FormatIssue {
-    diff: string;
+    line: number;      // 问题所在的行号（0-based）
+    column: number;     // 问题所在的列号（0-based）
+    rangeLength: number; // 问题范围的长度（用于高亮）
+    oldContent?: string;  // 原始内容（带 - 前缀的行）
+    newContent?: string;  // 新内容（带 + 前缀的行）
+    message?: string;  // 问题描述
 }
 
 /**

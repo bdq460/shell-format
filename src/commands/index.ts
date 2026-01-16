@@ -9,12 +9,16 @@ import { registerFixAllCommand } from './fixCommand';
 
 /**
  * 注册所有命令
+ *
+ * @param diagnosticCollection VSCode 诊断集合
  */
-export function registerAllCommands(): vscode.Disposable[] {
+export function registerAllCommands(
+    diagnosticCollection: vscode.DiagnosticCollection
+): vscode.Disposable[] {
     logger.info('Registering all commands');
     return [
         // 不需要注册格式化文档命令, extension.ts中注册了DocumentRangeFormattingEditProvider
         // registerFormatCommand(),
-        registerFixAllCommand()
+        registerFixAllCommand(diagnosticCollection)
     ];
 }

@@ -5,15 +5,19 @@
 
 import * as vscode from 'vscode';
 import { PackageInfo } from '../config';
-import { getDiagnosticCollection } from '../diagnostics';
+import { diagnoseDocument } from '../diagnostics';
 import { formatDocument } from '../formatters';
 import { logger } from '../utils/log';
 
 /**
  * 注册修复所有问题命令
  * 其实也是调用的格式化文档命令
+ *
+ * @param diagnosticCollection VSCode 诊断集合
  */
-export function registerFixAllCommand(): vscode.Disposable {
+export function registerFixAllCommand(
+    diagnosticCollection: vscode.DiagnosticCollection
+): vscode.Disposable {
     logger.info('Registering fix all problems command');
     return vscode.commands.registerCommand(
         PackageInfo.commandFixAllProblems,
@@ -51,13 +55,18 @@ export function registerFixAllCommand(): vscode.Disposable {
                 }
                 // 应用修复操作
                 await vscode.workspace.applyEdit(edit);
+                // 修复后重新诊断
+                const diagnostics = await diagnoseDocument(document);
+                diagnosticCollection.set(document.uri, diagnostics);
                 // 显示成功消息
                 vscode.window.showInformationMessage(
                     "All problems fixed successfully."
                 );
             } else if (edits && edits.length === 0) {
                 logger.info('No formatting fixes return.');
-                const diagnostics = getDiagnosticCollection().get(document.uri) || [];
+                // 无修复操作，直接诊断
+                const diagnostics = await diagnoseDocument(document);
+                diagnosticCollection.set(document.uri, diagnostics);
                 const hasDiagnostics = diagnostics.length > 0;
                 if (hasDiagnostics) {
                     logger.info('No formatting fixes needed, but diagnostics found.');
