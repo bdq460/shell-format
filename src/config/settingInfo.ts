@@ -3,13 +3,29 @@
  * 统一管理从 package.json 读取的默认配置值
  */
 
-import * as vscode from 'vscode';
-import { PackageInfo } from './packageInfo';
+import * as vscode from "vscode";
+import { PackageInfo } from "./packageInfo";
 
 /**
- * 默认配置信息类
- * 统一管理从 package.json 的 contributes.configuration.properties 读取的默认配置
+ * 日志配置接口
  */
+interface LogConfig {
+    enabled: boolean;
+    level: string;
+    format: string;
+}
+
+/**
+ * 配置缓存接口
+ * 缓存从 settings.json 读取的配置值
+ */
+interface ConfigCache {
+    shfmtPath: string;
+    shellcheckPath: string;
+    tabSize: number | string;
+    log: LogConfig;
+    onError: string;
+}
 
 /**
  * 配置管理工具
@@ -22,11 +38,49 @@ import { PackageInfo } from './packageInfo';
  * - 配置变更检测
  *
  * 优先使用用户配置，若用户未配置则使用 package.json 中定义的默认值
+ *
+ * 缓存机制：
+ * - SettingInfo 内部缓存配置值
+ * - 配置变化时调用 refreshCache() 刷新缓存
+ * - 业务代码只关注配置变化后的刷新逻辑
  */
 export class SettingInfo {
-
-    // 缓存配置对象，避免重复调用 getConfiguration
+    // 缓存配置节名称
     private static configSection: string = PackageInfo.extensionName;
+
+    // 配置缓存（缓存从 settings.json 读取的值）
+    private static configCache: ConfigCache | null = null;
+
+    /**
+     * 初始化或刷新配置缓存
+     *
+     * 使用场景：
+     * - 首次调用时初始化缓存
+     * - 配置变化后刷新缓存
+     *
+     * 业务代码职责：
+     * - 监听 onDidChangeConfiguration 事件
+     * - 判断配置是否变化
+     * - 如果变化，调用 SettingInfo.refreshCache()
+     */
+    static refreshCache(): void {
+        this.configCache = {
+            shfmtPath: this.getShfmtPathImpl(),
+            shellcheckPath: this.getShellcheckPathImpl(),
+            tabSize: this.getTabSizeImpl(),
+            log: this.getLogImpl(),
+            onError: this.getOnErrorImpl(),
+        };
+    }
+
+    /**
+     * 确保缓存已初始化
+     */
+    private static ensureCacheInitialized(): void {
+        if (!this.configCache) {
+            this.refreshCache();
+        }
+    }
 
     /**
      * 获取配置对象
@@ -37,10 +91,48 @@ export class SettingInfo {
         return vscode.workspace.getConfiguration(section || this.configSection);
     }
 
+    // ==================== 内部实现：从 VSCode 读取配置（不使用缓存） ====================
+
+    private static getShfmtPathImpl(): string {
+        const config = this.getConfig();
+        return config.get<string>("shfmtPath", PackageInfo.defaultShfmtPath);
+    }
+
+    private static getShellcheckPathImpl(): string {
+        const config = this.getConfig();
+        return config.get<string>("shellcheck", PackageInfo.defaultShellCheckPath);
+    }
+
+    private static getLogImpl(): LogConfig {
+        const config = this.getConfig();
+        return config.get<LogConfig>("log", PackageInfo.defaultLog);
+    }
+
+    private static getTabSizeImpl(): number | string {
+        const config = this.getConfig();
+        return config.get<number | string>("tabSize", PackageInfo.defaultTabSize);
+    }
+
+    private static getOnErrorImpl(): string {
+        const config = this.getConfig();
+        return config.get<string>("onError", PackageInfo.defaultOnError);
+    }
+
+    /**
+     * 获取当前缓存快照
+     * @returns 当前缓存的配置快照，用于服务层判断配置是否变化
+     */
+    static getConfigSnapshot(): ConfigCache {
+        this.ensureCacheInitialized();
+        return this.configCache!;
+    }
+
+    // ==================== 配置变更检测 ====================
+
     // ==================== shellcheck 路径配置 ====================
     static getShellcheckPath(): string {
-        const config = this.getConfig();
-        return config.get<string>('shellcheck', PackageInfo.defaultShellCheckPath);
+        this.ensureCacheInitialized();
+        return this.configCache!.shellcheckPath;
     }
 
     // ==================== shfmt 路径配置 ====================
@@ -50,14 +142,14 @@ export class SettingInfo {
      * @returns shfmt 可执行文件的路径，优先使用用户配置，否则使用默认值 'shfmt'
      */
     static getShfmtPath(): string {
-        const config = this.getConfig();
-        return config.get<string>('shfmtPath', PackageInfo.defaultShfmtPath);
+        this.ensureCacheInitialized();
+        return this.configCache!.shfmtPath;
     }
 
     // ==================== log 配置 ====================
-    static getLogOutput(): string | undefined {
-        const config = this.getConfig();
-        return config.get<string>('logOutput', PackageInfo.defaultLogOutput);
+    static getLog(): LogConfig {
+        this.ensureCacheInitialized();
+        return this.configCache!.log;
     }
 
     // ==================== tabSize 配置 ====================
@@ -66,11 +158,10 @@ export class SettingInfo {
      * 获取 tab 缩进配置
      * @returns tab 缩进配置：数字表示空格数，字符串 'tab' 表示使用 tab 字符
      */
-    static getTabSize(): number | string {
-        const config = this.getConfig();
-        return config.get<number | string>('tabSize', PackageInfo.defaultTabSize);
+    private static getTabSize(): number | string {
+        this.ensureCacheInitialized();
+        return this.configCache!.tabSize;
     }
-
 
     /**
      * 获取 实际tab 缩进配置
@@ -78,14 +169,14 @@ export class SettingInfo {
      */
     static getRealTabSize(): number | undefined {
         const tabSetting = this.getTabSize();
-        if (tabSetting === 'ignore') {
+        if (tabSetting === "ignore") {
             return undefined;
-        } else if (typeof tabSetting === 'number' && tabSetting >= 0) {
+        } else if (typeof tabSetting === "number" && tabSetting >= 0) {
             // 使用空格缩进
-            return tabSetting
+            return tabSetting;
         }
         // 设置为 'vscode'或其他未知值, 默认使用 vscode 缩进
-        return vscode.workspace.getConfiguration('editor').get<number>('tabSize');
+        return vscode.workspace.getConfiguration("editor").get<number>("tabSize");
     }
 
     // ==================== 错误处理配置 ====================
@@ -100,49 +191,93 @@ export class SettingInfo {
      * @returns 错误处理方式，默认为 'showProblem'
      */
     static getOnErrorSetting(): string {
-        const config = this.getConfig();
-        return config.get<string>('onError', PackageInfo.defaultOnError);
-    }
-
-    // ==================== 参数构建 ====================
-
-    /**
-     * 构建 shfmt 参数列表
-     *
-     * 1. 不包括 '-w' 参数，因为该参数用于原地写入文件，而插件使用标准输入输出
-     * 2. tab 缩进配置优先使用用户配置，否则使用默认值, 默认值为 'vscode', 即使用vscode的缩进配置
-     *
-     * @returns 完整的 shfmt 参数数组
-     */
-    static buildShfmtArgs(): string[] {
-
-        const tabSize = this.getTabSize();
-        // 如果 vscode 没有配置缩进，则使用默认值
-        if (tabSize === undefined) {
-            return PackageInfo.defaultShfmtArgs;
-        }
-        return ['-i', `${tabSize}`, ...PackageInfo.defaultShfmtArgs];
+        this.ensureCacheInitialized();
+        return this.configCache!.onError;
     }
 
     // ==================== 配置变更检测 ====================
 
     /**
-     * 检查配置是否影响当前扩展
+     * 配置键列表：影响诊断的配置项
+     * 这些配置变化后需要重新诊断所有文件
+     */
+    static readonly DIAGNOSTIC_RELEVANT_CONFIG_KEYS = [
+        "shell-format.shfmtPath",
+        "shell-format.shellcheckPath",
+        "shell-format.tabSize",
+        "shell-format.onError",
+    ] as const;
+
+    /**
+     * 配置键列表：影响插件行为的配置项（包括诊断和非诊断配置）
+     * 这些配置变化后需要重新初始化插件组件
+     */
+    static readonly EXTENSION_RELEVANT_CONFIG_KEYS = [
+        ...this.DIAGNOSTIC_RELEVANT_CONFIG_KEYS,
+        "shell-format.log",
+    ] as const;
+
+    /**
+     * 检查配置是否影响诊断结果
      *
-     * 用于配置变更事件处理，判断是否需要重新初始化插件
+     * 用于配置变更事件处理，判断是否需要重新诊断所有 shell 脚本
+     *
+     * 优化：
+     * - 细粒度检测：只检测真正影响诊断结果的配置项
+     * - 避免不必要的重新诊断
+     * - 提升配置变化的响应速度
      *
      * @param event - VSCode 配置变更事件对象
-     * @returns 如果变更影响当前扩展返回 true，否则返回 false
+     * @returns 如果变更影响诊断结果返回 true，否则返回 false
      */
-    static isConfigurationChanged(event: vscode.ConfigurationChangeEvent): boolean {
-        // 监听本插件的配置变化
-        if (event.affectsConfiguration(this.configSection)) {
+    static isDiagnosticConfigChanged(
+        event: vscode.ConfigurationChangeEvent,
+    ): boolean {
+        // 细粒度检测：检查影响诊断的配置项
+        for (const key of this.DIAGNOSTIC_RELEVANT_CONFIG_KEYS) {
+            if (event.affectsConfiguration(key)) {
+                return true;
+            }
+        }
+
+        // 特殊处理：tabSize 设置为 'vscode' 时，需要监听 editor.tabSize 变化
+        if (
+            this.getTabSize() === "vscode" &&
+            event.affectsConfiguration("editor.tabSize")
+        ) {
             return true;
         }
-        // 只有当 shellformat.tabSize 设置为 'vscode' 时，才需要监听 editor.tabSize 变化
-        if (this.getTabSize() === 'vscode' && event.affectsConfiguration('editor.tabSize')) {
+
+        return false;
+    }
+
+    /**
+     * 检查扩展的配置是否发生变化
+     *
+     * 用于配置变更事件处理，判断是否需要重新初始化插件组件
+     * 包括：服务实例、诊断缓存、日志输出等
+     *
+     * @param event - VSCode 配置变更事件对象
+     * @returns 如果扩展相关配置发生变化返回 true，否则返回 false
+     */
+    static isConfigurationChanged(
+        event: vscode.ConfigurationChangeEvent,
+    ): boolean {
+        // 检查所有影响插件行为的配置项
+        for (const key of this.EXTENSION_RELEVANT_CONFIG_KEYS) {
+            if (event.affectsConfiguration(key)) {
+                return true;
+            }
+        }
+
+        // 特殊处理：tabSize 设置为 'vscode' 时，需要监听 editor.tabSize 变化
+        if (
+            this.getTabSize() === "vscode" &&
+            event.affectsConfiguration("editor.tabSize")
+        ) {
             return true;
         }
+
         return false;
     }
 }

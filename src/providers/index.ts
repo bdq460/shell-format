@@ -3,19 +3,18 @@
  * 提供快速修复和修复所有问题的功能
  */
 
-import * as vscode from 'vscode';
-import { PackageInfo } from '../config';
-import { logger } from '../utils/log';
+import * as vscode from "vscode";
+import { PackageInfo } from "../config";
+import { logger } from "../utils/log";
 
 /**
  * ShellFormat Code Action 提供者
  *
  * @param diagnosticCollection VSCode 诊断集合
  */
-export class ShellFormatCodeActionProvider implements vscode.CodeActionProvider {
-    constructor(
-        private diagnosticCollection: vscode.DiagnosticCollection
-    ) { }
+export class ShellFormatCodeActionProvider
+    implements vscode.CodeActionProvider {
+    constructor(private diagnosticCollection: vscode.DiagnosticCollection) { }
     /**
      * 提供 Code Actions
      * provideCodeActions 的调用机制
@@ -31,54 +30,86 @@ export class ShellFormatCodeActionProvider implements vscode.CodeActionProvider 
         document: vscode.TextDocument,
         range: vscode.Range | vscode.Selection,
         context: vscode.CodeActionContext,
-        _token: vscode.CancellationToken
+        _token: vscode.CancellationToken,
     ): vscode.ProviderResult<(vscode.CodeAction | vscode.Command)[]> {
         const actions: vscode.CodeAction[] = [];
 
         logger.info(`========== provideCodeActions called ==========`);
         logger.info(`Document: ${document.fileName}`);
-        logger.info(`Range: [${range.start.line}, ${range.start.character}] - [${range.end.line}, ${range.end.character}]`);
-        logger.info(`context.only: ${context.only ? context.only.value : 'undefined'}`);
+        logger.info(
+            `Range: [${range.start.line}, ${range.start.character}] - [${range.end.line}, ${range.end.character}]`,
+        );
+        logger.info(
+            `context.only: ${context.only ? context.only.value : "undefined"}`,
+        );
         logger.info(`context.triggerKind: ${context.triggerKind}`);
         logger.info(`context.diagnostics: ${JSON.stringify(context.diagnostics)}`);
         logger.info(`context.diagnostics.length: ${context.diagnostics?.length}`);
 
         // 从 DiagnosticCollection 获取当前文档的所有诊断
-        const documentDiagnostics = this.diagnosticCollection.get(document.uri) || [];
+        const documentDiagnostics =
+            this.diagnosticCollection.get(document.uri) || [];
 
         logger.info(`documentDiagnostics.length: ${documentDiagnostics.length}`);
 
         // 检查是否有来自本扩展的诊断
         const matchingDiagnostics = documentDiagnostics.filter(
-            (d: vscode.Diagnostic) => d.source === PackageInfo.diagnosticSource
+            (d: vscode.Diagnostic) => d.source === PackageInfo.diagnosticSource,
         );
 
         // 如果没有来自本扩展的诊断问题，则不提供任何操作
         if (matchingDiagnostics.length === 0) {
-            logger.info('No matching diagnostics found from this extension.');
+            logger.info("No matching diagnostics found from this extension.");
             return actions;
         }
 
-        logger.info(`Found ${matchingDiagnostics.length} matching diagnostics from this extension.`);
+        logger.info(
+            `Found ${matchingDiagnostics.length} matching diagnostics from this extension.`,
+        );
 
         // 策略：
-        // - "Fix all problems with shell-format" 总是显示（全局操作）
+        // - "Fix all problems with shell-format" 支持 SourceFixAll（"Fix All" 命令）
         // - "Fix this issue with shell-format" 只在 context.diagnostics 有诊断时显示（光标在错误位置）
-        // - 由于诊断的 range 很小（1 个字符），光标很难在范围内，所以 "Fix this issue" 可能很少显示
+
+        // 如果 context.only 是 SourceFixAll，则返回FixAll action
+        if (
+            context.only &&
+            context.only.contains(vscode.CodeActionKind.SourceFixAll)
+        ) {
+            logger.info(
+                `context.only is SourceFixAll, providing Fix All action!context.only:${context.only.value}`,
+            );
+            const fixAllAction = new vscode.CodeAction(
+                PackageInfo.codeActionFixAllTitle,
+                vscode.CodeActionKind.SourceFixAll,
+            );
+            fixAllAction.command = {
+                title: PackageInfo.codeActionFixAllTitle,
+                command: PackageInfo.commandFixAllProblems,
+                arguments: [document.uri],
+            };
+            actions.push(fixAllAction);
+            logger.info(
+                `Added SourceFixAll action: ${PackageInfo.codeActionFixAllTitle}`,
+            );
+            return actions;
+        }
 
         // 如果 context.diagnostics 有来自本扩展的诊断，创建 "Fix this issue"
         if (context.diagnostics && context.diagnostics.length > 0) {
             // 检查 context.diagnostics 是否有来自本扩展的诊断
             const contextMatchingDiagnostics = context.diagnostics.filter(
-                d => d.source === PackageInfo.diagnosticSource
+                (d) => d.source === PackageInfo.diagnosticSource,
             );
             if (contextMatchingDiagnostics.length > 0) {
-                logger.info(`Context has matching diagnostics, will provide "Fix this issue"`);
+                logger.info(
+                    `Context has matching diagnostics, will provide "Fix this issue"`,
+                );
                 // 只为第一个匹配的诊断创建 QuickFix，避免重复
                 const diagnostic = contextMatchingDiagnostics[0];
                 const fixThisAction = new vscode.CodeAction(
                     PackageInfo.codeActionQuickFixTitle,
-                    vscode.CodeActionKind.QuickFix
+                    vscode.CodeActionKind.QuickFix,
                 );
                 // 关联当前诊断问题
                 fixThisAction.diagnostics = [diagnostic];
@@ -86,10 +117,12 @@ export class ShellFormatCodeActionProvider implements vscode.CodeActionProvider 
                 fixThisAction.command = {
                     title: PackageInfo.codeActionQuickFixTitle,
                     command: PackageInfo.commandFixAllProblems,
-                    arguments: [document.uri]
+                    arguments: [document.uri],
                 };
                 actions.push(fixThisAction);
-                logger.info(`Added QuickFix action: ${PackageInfo.codeActionQuickFixTitle}`);
+                logger.info(
+                    `Added QuickFix action: ${PackageInfo.codeActionQuickFixTitle}`,
+                );
             } else {
                 logger.info(`Context has diagnostics but none from this extension.`);
             }
@@ -101,19 +134,23 @@ export class ShellFormatCodeActionProvider implements vscode.CodeActionProvider 
         // 不关联任何特定诊断，这样会在右键菜单中单独显示
         const fixAllAction = new vscode.CodeAction(
             PackageInfo.codeActionFixAllTitle,
-            vscode.CodeActionKind.QuickFix
+            vscode.CodeActionKind.QuickFix,
         );
         fixAllAction.command = {
             title: PackageInfo.codeActionFixAllTitle,
             command: PackageInfo.commandFixAllProblems,
-            arguments: [document.uri]
+            arguments: [document.uri],
         };
         actions.push(fixAllAction);
-        logger.info(`Added QuickFix action for whole document: ${PackageInfo.codeActionFixAllTitle}`);
+        logger.info(
+            `Added QuickFix action for whole document: ${PackageInfo.codeActionFixAllTitle}`,
+        );
 
         logger.info(`Final total actions returned: ${actions.length}`);
         for (let i = 0; i < actions.length; i++) {
-            logger.info(`Action ${i + 1}: ${actions[i].title}, kind: ${actions[i].kind?.value}`);
+            logger.info(
+                `Action ${i + 1}: ${actions[i].title}, kind: ${actions[i].kind?.value}`,
+            );
         }
 
         return actions;

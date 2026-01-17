@@ -1,4 +1,3 @@
-
 /**
  * 默认日志记录器
  */
@@ -9,9 +8,9 @@ export let logger: Logger;
  * @param log 日志记录器
  */
 export function setLogger(log: Logger) {
-    console.log('Set logger');
+    console.log("Set logger");
     if (!logger) {
-        console.log('logger is null set by param');
+        console.log("logger is null set by param");
         logger = log;
     }
 }
@@ -22,6 +21,7 @@ export function setLogger(log: Logger) {
  */
 export interface Logger {
     info(message: string): void;
+    warn(message: string): void;
     error(message: string): void;
     debug?(message: string): void;
 }

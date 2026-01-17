@@ -3,9 +3,9 @@
  * 纯粹的进程执行逻辑，与业务和 VSCode 无关
  */
 
-import { spawn } from 'child_process';
-import { ToolExecutionError } from '../errors';
-import { ExecutionResult, ExecutorOptions } from './types';
+import { spawn } from "child_process";
+import { ToolExecutionError } from "../errors";
+import { ExecutionResult, ExecutorOptions } from "./types";
 
 /**
  * 通用进程执行器
@@ -16,14 +16,14 @@ export async function execute(
     options: ExecutorOptions,
 ): Promise<ExecutionResult> {
     const { args, token, logger } = options;
-    const fullCommand = `${command} ${args.join(' ')}`;
+    const fullCommand = `${command} ${args.join(" ")}`;
 
     logger?.info(`Executing: ${fullCommand}`);
 
     return new Promise((resolve, reject) => {
         if (token?.isCancellationRequested) {
-            logger?.info('Execution cancelled');
-            reject(new Error('Execution cancelled'));
+            logger?.info("Execution cancelled");
+            reject(new Error("Execution cancelled"));
             return;
         }
 
@@ -31,18 +31,20 @@ export async function execute(
         const stdout: Buffer[] = [];
         const stderr: Buffer[] = [];
 
-        process.stdout.on('data', (chunk) => {
+        process.stdout.on("data", (chunk) => {
             stdout.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
         });
 
-        process.stderr.on('data', (chunk) => {
+        process.stderr.on("data", (chunk) => {
             stderr.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
         });
 
-        process.on('close', (code) => {
+        process.on("close", (code) => {
             const stdoutStr = Buffer.concat(stdout).toString();
             const stderrStr = Buffer.concat(stderr).toString();
-            logger?.info(`Execution completed with code: ${code}\nstdout: ${stdoutStr}\nstderr: ${stderrStr}`);
+            logger?.info(
+                `Execution completed with code: ${code}\nstdout: ${stdoutStr}\nstderr: ${stderrStr}`,
+            );
 
             // 记录 stdout 和 stderr（始终记录）
             // logger?.debug?.(`stdout: ${stdoutStr}`);
@@ -51,20 +53,17 @@ export async function execute(
             resolve({
                 exitCode: code,
                 stdout: stdoutStr,
-                stderr: stderrStr
+                stderr: stderrStr,
             });
         });
 
-        process.on('error', (err) => {
+        process.on("error", (err) => {
             logger?.error(`Execution error: ${err.message}`);
-            reject(new ToolExecutionError(
-                err as NodeJS.ErrnoException,
-                fullCommand
-            ));
+            reject(new ToolExecutionError(err as NodeJS.ErrnoException, fullCommand));
         });
 
         token?.onCancellationRequested(() => {
-            logger?.info('Killing process due to cancellation');
+            logger?.info("Killing process due to cancellation");
             process.kill();
         });
     });

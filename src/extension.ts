@@ -3,15 +3,23 @@
  * 基于 shfmt 和 shellcheck 的 Shell 脚本格式化插件
  */
 
-import * as path from 'path';
-import * as vscode from 'vscode';
-import { initializeLoggerAdapter, LoggerAdapter } from './adapters/loggerAdapter';
-import { registerAllCommands } from './commands';
-import { PackageInfo, SettingInfo } from './config';
-import { diagnoseAllShellScripts, diagnoseDocument } from './diagnostics';
-import { formatDocument } from './formatters';
-import { ShellFormatCodeActionProvider } from './providers';
-import { logger } from './utils/log';
+import * as path from "path";
+import * as vscode from "vscode";
+import {
+    initializeLoggerAdapter,
+    LoggerAdapter,
+} from "./adapters/loggerAdapter";
+import { registerAllCommands } from "./commands";
+import { PackageInfo, SettingInfo } from "./config";
+import {
+    defaultDiagnosticCache,
+    diagnoseAllShellScripts,
+    diagnoseDocument,
+} from "./diagnostics";
+import { formatDocument } from "./formatters";
+import { ShellFormatCodeActionProvider } from "./providers";
+import { ServiceManager } from "./services/serviceManager";
+import { logger } from "./utils/log";
 
 /**
  * 检查是否应该跳过该文件
@@ -25,31 +33,30 @@ function shouldSkipFile(fileName: string): boolean {
 
     // 跳过 Git 冲突文件、临时文件等
     const skipPatterns = [
-        /\.git$/,         // Git 冲突文件
-        /\.swp$/,         // Vim 临时文件
-        /\.swo$/,         // Vim 交换文件
-        /~$/,             // 备份文件
-        /\.tmp$/,         // 临时文件
-        /\.bak$/,         // 备份文件
+        /\.git$/, // Git 冲突文件
+        /\.swp$/, // Vim 临时文件
+        /\.swo$/, // Vim 交换文件
+        /~$/, // 备份文件
+        /\.tmp$/, // 临时文件
+        /\.bak$/, // 备份文件
         /^extension-output-/, // VSCode 扩展开发输出文件
     ];
 
-    return skipPatterns.some(pattern => pattern.test(baseName));
+    return skipPatterns.some((pattern) => pattern.test(baseName));
 }
 
-// 防抖定时器
-let debounceTimer: NodeJS.Timeout | undefined;
+// 防抖定时器 Map (key: document URI string, value: timer)
+const debounceTimers = new Map<string, NodeJS.Timeout>();
 
 /**
  * 扩展激活函数
  */
 export function activate(context: vscode.ExtensionContext) {
-
-    console.log('Start initialize logger');
+    console.log("Start initialize logger");
     // 初始化日志
     initializeLoggerAdapter();
 
-    logger.info('Extension is now active');
+    logger.info("Extension is now active");
 
     // 创建诊断集合
     //
@@ -67,8 +74,10 @@ export function activate(context: vscode.ExtensionContext) {
     //  - 内存占用：保存大量诊断信息占用内存
     //  - UI 资源：编辑器中的波浪线、灯泡图标等 UI 元素
     //  - 事件监听：内部可能有事件监听器
-    logger.info('Diagnostic collection created');
-    const diagnosticCollection = vscode.languages.createDiagnosticCollection(PackageInfo.extensionName);
+    logger.info("Diagnostic collection created");
+    const diagnosticCollection = vscode.languages.createDiagnosticCollection(
+        PackageInfo.extensionName,
+    );
 
     // 注册文档格式化提供者
     // 通过快捷键,或命令面板中或选中代码后的右键菜单中调用Format Document 命令时调用会触发注册的函数
@@ -126,31 +135,38 @@ export function activate(context: vscode.ExtensionContext) {
     // 注意：Shell 脚本的格式化需要完整的上下文（if/fi、do/done 等配对），
     // 因此即使只选中部分文本，也需要对整个文档进行格式化。
     // VSCode 会自动裁剪 TextEdit，只应用选区内的变更。
-    logger.info('Registering document range formatting provider');
-    const rangeFormatProvider = vscode.languages.registerDocumentRangeFormattingEditProvider(
-        PackageInfo.languageId,
-        {
-            provideDocumentRangeFormattingEdits(
-                document: vscode.TextDocument,
-                range: vscode.Range,
-                options: vscode.FormattingOptions,
-                token: vscode.CancellationToken
-            ): vscode.ProviderResult<vscode.TextEdit[]> {
-                // 防御性检查：确保语言类型匹配（虽然 VSCode 已过滤，但保持代码一致性）
-                if (document.languageId !== PackageInfo.languageId) {
-                    return [];
-                }
-                // 跳过特殊文件
-                if (shouldSkipFile(document.fileName)) {
-                    logger.info(`Skipping range formatting for: ${document.fileName} (special file)`);
-                    return [];
-                }
-                logger.info(`Document range formatting triggered! Document: ${document.fileName}, range: [${range.start.line}, ${range.start.character}] - [${range.end.line}, ${range.end.character}]`);
-                logger.info(`Note: Shell script formatting requires full document context, will format entire document`);
-                return formatDocument(document, options, token);
-            }
-        }
-    );
+    logger.info("Registering document range formatting provider");
+    const rangeFormatProvider =
+        vscode.languages.registerDocumentRangeFormattingEditProvider(
+            PackageInfo.languageId,
+            {
+                provideDocumentRangeFormattingEdits(
+                    document: vscode.TextDocument,
+                    range: vscode.Range,
+                    options: vscode.FormattingOptions,
+                    token: vscode.CancellationToken,
+                ): vscode.ProviderResult<vscode.TextEdit[]> {
+                    // 防御性检查：确保语言类型匹配（虽然 VSCode 已过滤，但保持代码一致性）
+                    if (document.languageId !== PackageInfo.languageId) {
+                        return [];
+                    }
+                    // 跳过特殊文件
+                    if (shouldSkipFile(document.fileName)) {
+                        logger.info(
+                            `Skipping range formatting for: ${document.fileName} (special file)`,
+                        );
+                        return [];
+                    }
+                    logger.info(
+                        `Document range formatting triggered! Document: ${document.fileName}, range: [${range.start.line}, ${range.start.character}] - [${range.end.line}, ${range.end.character}]`,
+                    );
+                    logger.info(
+                        `Note: Shell script formatting requires full document context, will format entire document`,
+                    );
+                    return formatDocument(document, options, token);
+                },
+            },
+        );
 
     // 注册 Code Actions 类型提供者
     // 1. PackageInfo.languageId,: 绑定特定语言
@@ -219,25 +235,25 @@ export function activate(context: vscode.ExtensionContext) {
     //    - 点击灯泡图标 💡
     //    - 或按 Cmd +. / Ctrl +.
     //
-    logger.info('Registering code actions provider!');
+    logger.info("Registering code actions provider!");
     const codeActionProvider = vscode.languages.registerCodeActionsProvider(
         PackageInfo.languageId,
         new ShellFormatCodeActionProvider(diagnosticCollection),
         {
             providedCodeActionKinds: [
                 vscode.CodeActionKind.QuickFix,
-                vscode.CodeActionKind.SourceFixAll.append(PackageInfo.extensionName)
-            ]
-        }
+                vscode.CodeActionKind.SourceFixAll.append(PackageInfo.extensionName),
+            ],
+        },
     );
 
     // 注册所有命令
     // 绑定命令名称和具体实现
-    logger.info('Registering commands');
+    logger.info("Registering commands");
     const commands = registerAllCommands(diagnosticCollection);
 
     // 监听文档保存时进行诊断
-    logger.info('Registering document save listener');
+    logger.info("Registering document save listener");
     const saveListener = vscode.workspace.onDidSaveTextDocument(
         async (document) => {
             // 只处理 shell 语言文件
@@ -246,17 +262,31 @@ export function activate(context: vscode.ExtensionContext) {
             }
             // 跳过特殊文件
             if (shouldSkipFile(document.fileName)) {
-                logger.info(`Skipping save diagnosis for: ${document.fileName} (special file)`);
+                logger.info(
+                    `Skipping save diagnosis for: ${document.fileName} (special file)`,
+                );
                 return;
             }
             logger.info(`Document saved: ${document.fileName}`);
+
+            // 清除该文档的防抖定时器，避免被后续的防抖诊断覆盖
+            const uri = document.uri.toString();
+            const existingTimer = debounceTimers.get(uri);
+            if (existingTimer) {
+                clearTimeout(existingTimer);
+                debounceTimers.delete(uri);
+                logger.info(
+                    `Cleared debounce timer for saved document: ${document.fileName}`,
+                );
+            }
+
             const diagnostics = await diagnoseDocument(document);
             diagnosticCollection.set(document.uri, diagnostics);
-        }
+        },
     );
 
     // 监听文档打开时进行诊断
-    logger.info('Registering document open listener');
+    logger.info("Registering document open listener");
     const openListener = vscode.workspace.onDidOpenTextDocument(
         async (document) => {
             // 只处理 shell 语言文件
@@ -265,16 +295,18 @@ export function activate(context: vscode.ExtensionContext) {
             }
             // 跳过特殊文件
             if (shouldSkipFile(document.fileName)) {
-                logger.info(`Skipping open diagnosis for: ${document.fileName} (special file)`);
+                logger.info(
+                    `Skipping open diagnosis for: ${document.fileName} (special file)`,
+                );
                 return;
             }
             const diagnostics = await diagnoseDocument(document);
             diagnosticCollection.set(document.uri, diagnostics);
-        }
+        },
     );
 
     // 监听文档内容变化时进行诊断（防抖）
-    logger.info('Registering document change listener');
+    logger.info("Registering document change listener");
     const changeListener = vscode.workspace.onDidChangeTextDocument(
         async (event) => {
             // 只处理 shell 语言文件
@@ -283,42 +315,73 @@ export function activate(context: vscode.ExtensionContext) {
             }
             // 跳过特殊文件
             if (shouldSkipFile(event.document.fileName)) {
-                logger.info(`Skipping change diagnosis for: ${event.document.fileName} (special file)`);
+                logger.info(
+                    `Skipping change diagnosis for: ${event.document.fileName} (special file)`,
+                );
                 return;
             }
-            logger.info(`Document change happened, trigger debounceDiagnose for: ${event.document.fileName}`);
+            logger.info(
+                `Document change happened, trigger debounceDiagnose for: ${event.document.fileName}`,
+            );
             debounceDiagnose(event.document, diagnosticCollection);
-        }
+        },
     );
 
     // 监听配置变化
     // 监听配置变化时重新诊断所有 shell 脚本
     // onDidChangeConfiguration会监听配置变化, 包括用户settings.json或工作区.vscode/settings.json所有配置变化
-    logger.info('Registering configuration change listener');
-    const configChangeListener = vscode.workspace.onDidChangeConfiguration(async (event) => {
-        logger.info(`Configuration change event happend!event:${event}`);
-        // 当修改涉及本插件的配置时, 才需要重新诊断所有 shell 脚本
-        if (SettingInfo.isConfigurationChanged(event)) {
-            logger.info('Extension related configuration changed, re-diagnosing all shell scripts');
-            const results = await diagnoseAllShellScripts();
-            results.forEach((diagnostics, uri) => {
-                diagnosticCollection.set(uri, diagnostics);
-            });
-        }
-    });
+    logger.info("Registering configuration change listener");
+    const configChangeListener = vscode.workspace.onDidChangeConfiguration(
+        async (event) => {
+            logger.info(`Configuration change event happened! event:${event}`);
+
+            // 检查扩展相关配置是否变化
+            if (SettingInfo.isConfigurationChanged(event)) {
+                logger.info("Extension relevant configuration changed");
+
+                // 步骤 1: 刷新 SettingInfo 的配置缓存
+                // 这是核心：所有配置缓存在 SettingInfo 中统一管理
+                SettingInfo.refreshCache();
+
+                // 步骤 2: 检查是否需要重新诊断
+                if (SettingInfo.isDiagnosticConfigChanged(event)) {
+                    logger.info(
+                        "Diagnostic relevant configuration changed, re-diagnosing all documents",
+                    );
+
+                    // 失效服务缓存
+                    const serviceManager = ServiceManager.getInstance(logger);
+                    serviceManager.invalidate();
+
+                    // 清除诊断结果缓存
+                    defaultDiagnosticCache.invalidateAll();
+
+                    // 重新诊断所有文档
+                    const results = await diagnoseAllShellScripts();
+                    results.forEach((diagnostics, uri) => {
+                        diagnosticCollection.set(uri, diagnostics);
+                    });
+                }
+
+                logger.info("Configuration change handled successfully");
+            }
+        },
+    );
 
     // 安装插件后, 异步诊断所有打开的 shell 脚本
     // 这是为了确保用户在安装插件后, 能够立即看到所有 shell 脚本的诊断结果
     // 注意：不等待结果，避免阻塞 activate 函数
-    logger.info('Starting background diagnosis for all open shell scripts');
-    diagnoseAllShellScripts().then(results => {
-        results.forEach((diagnostics, uri) => {
-            diagnosticCollection.set(uri, diagnostics);
+    logger.info("Starting background diagnosis for all open shell scripts");
+    diagnoseAllShellScripts()
+        .then((results) => {
+            results.forEach((diagnostics, uri) => {
+                diagnosticCollection.set(uri, diagnostics);
+            });
+            logger.info("Background diagnosis completed");
+        })
+        .catch((error) => {
+            logger.error(`Background diagnosis failed: ${String(error)}`);
         });
-        logger.info('Background diagnosis completed');
-    }).catch(error => {
-        logger.error(`Background diagnosis failed: ${String(error)}`);
-    });
 
     // 退出时清理
     // 自动清理机制
@@ -340,7 +403,7 @@ export function activate(context: vscode.ExtensionContext) {
         openListener,
         changeListener,
         configChangeListener,
-        diagnosticCollection
+        diagnosticCollection,
     );
 }
 
@@ -359,17 +422,26 @@ export function activate(context: vscode.ExtensionContext) {
 function debounceDiagnose(
     document: vscode.TextDocument,
     diagnosticCollection: vscode.DiagnosticCollection,
-    delay: number = 500
+    delay: number = 300,
 ): void {
+    const uri = document.uri.toString();
     logger.info(`Debouncing diagnose for: ${document.fileName}`);
-    if (debounceTimer) {
-        // 清除之前的定时器，避免重复触发, 确保只有最后一次触发产生的定时器可以保留下来
-        clearTimeout(debounceTimer);
+
+    // 清除该文档之前的定时器
+    const existingTimer = debounceTimers.get(uri);
+    if (existingTimer) {
+        clearTimeout(existingTimer);
     }
-    debounceTimer = setTimeout(async () => {
+
+    // 设置新的定时器
+    const timer = setTimeout(async () => {
         const diagnostics = await diagnoseDocument(document);
         diagnosticCollection.set(document.uri, diagnostics);
+        // 清除定时器引用
+        debounceTimers.delete(uri);
     }, delay);
+
+    debounceTimers.set(uri, timer);
 }
 
 /**
@@ -377,17 +449,18 @@ function debounceDiagnose(
  *
  * 清理说明：
  * - context.subscriptions 中的资源由 VSCode 自动清理
- * - debounceTimer 需要手动清理
+ * - debounceTimers 需要手动清理
  * - logger 需要手动清理
  */
 export function deactivate() {
-    logger.info('Extension is now deactivated');
+    logger.info("Extension is now deactivated");
 
-    // 清理防抖定时器
-    if (debounceTimer) {
-        clearTimeout(debounceTimer);
-        logger.info('Debounce timer cleared');
+    // 清理所有防抖定时器
+    for (const [uri, timer] of debounceTimers) {
+        clearTimeout(timer);
+        logger.info(`Debounce timer cleared for: ${uri}`);
     }
+    debounceTimers.clear();
 
     // 清理日志输出通道
     // logger转换为LoggerAdapter

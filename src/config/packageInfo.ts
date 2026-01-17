@@ -172,8 +172,8 @@ export class PackageInfo {
      * @returns shellcheck 可执行文件的默认路径，默认为 'shellcheck'
      */
     static get defaultShellCheckPath(): string {
-        const configProperties = packageJson.contributes?.configuration?.properties;
-        return configProperties?.[`${PackageInfo.extensionName}.shellcheckPath` as keyof typeof configProperties]?.default
+        const configProperties = packageJson.contributes?.configuration?.properties as any;
+        return configProperties?.[`${PackageInfo.extensionName}.shellcheckPath`]?.default
             || 'shellcheck';
     }
 
@@ -184,8 +184,8 @@ export class PackageInfo {
      * @returns shfmt 可执行文件的默认路径，默认为 'shfmt'
      */
     static get defaultShfmtPath(): string {
-        const configProperties = packageJson.contributes?.configuration?.properties;
-        return configProperties?.[`${PackageInfo.extensionName}.shfmtPath` as keyof typeof configProperties]?.default
+        const configProperties = packageJson.contributes?.configuration?.properties as any;
+        return configProperties?.[`${PackageInfo.extensionName}.shfmtPath`]?.default
             || 'shfmt';
     }
 
@@ -198,13 +198,17 @@ export class PackageInfo {
     }
 
     /**
-     * 获取默认的日志输出
-     * @returns 默认的日志输出方式，可选值为 'off' 或 'on'
+     * 获取默认的日志配置
+     * @returns 默认的日志配置对象
      */
-    static get defaultLogOutput(): string {
-        const configProperties = packageJson.contributes?.configuration?.properties;
-        return configProperties?.[`${PackageInfo.extensionName}.logOutput` as keyof typeof configProperties]?.default
-            || 'off';
+    static get defaultLog(): {
+        enabled: boolean;
+        level: string;
+        format: string;
+    } {
+        const configProperties = packageJson.contributes?.configuration?.properties as any;
+        return configProperties?.[`${PackageInfo.extensionName}.log`]?.default
+            || { enabled: false, level: 'info', format: 'timestamp' };
     }
 
     /**
@@ -212,8 +216,8 @@ export class PackageInfo {
      * @returns 默认的错误处理方式，可选值为 'showProblem' 或 'ignore'
      */
     static get defaultOnError(): string {
-        const configProperties = packageJson.contributes?.configuration?.properties;
-        return configProperties?.[`${PackageInfo.extensionName}.onError` as keyof typeof configProperties]?.default
+        const configProperties = packageJson.contributes?.configuration?.properties as any;
+        return configProperties?.[`${PackageInfo.extensionName}.onError`]?.default
             || 'showProblem';
     }
 
@@ -226,8 +230,8 @@ export class PackageInfo {
      * 默认值为 'vscode'
      */
     static get defaultTabSize(): number | string {
-        const configProperties = packageJson.contributes?.configuration?.properties;
-        return configProperties?.[`${PackageInfo.extensionName}.tabSize` as keyof typeof configProperties]?.default
+        const configProperties = packageJson.contributes?.configuration?.properties as any;
+        return configProperties?.[`${PackageInfo.extensionName}.tabSize`]?.default
             || "vscode";
     }
 }

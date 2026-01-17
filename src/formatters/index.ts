@@ -1,11 +1,15 @@
 /**
  * 文档格式化器模块
  * 提供文档格式化功能
+ *
+ * 架构优化：
+ * 1. 使用 ServiceManager 单例管理服务实例
+ * 2. 自动处理配置变化和缓存
  */
 
 import * as vscode from 'vscode';
 import { FormatterAdapter } from '../adapters';
-import { getShfmtService } from '../services';
+import { ServiceManager } from '../services';
 import { logger } from '../utils/log';
 
 // ==================== 格式化执行层 ====================
@@ -22,8 +26,9 @@ async function runFormat(
 ): Promise<vscode.TextEdit[]> {
     logger.info(`Start format document: ${document.fileName}`);
 
-    // 只传递 fileName
-    const result = await getShfmtService(logger).format(document.fileName, token);
+    // 使用 ServiceManager 获取服务实例（自动处理缓存和配置变化）
+    const serviceManager = ServiceManager.getInstance(logger);
+    const result = await serviceManager.getShfmtService().format(document.fileName, token);
 
     // 返回格式化结果（格式化模块不处理诊断）
     return FormatterAdapter.convert(result, document);
