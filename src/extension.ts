@@ -11,11 +11,7 @@ import {
 } from "./adapters/loggerAdapter";
 import { registerAllCommands } from "./commands";
 import { PackageInfo, SettingInfo } from "./config";
-import {
-    defaultDiagnosticCache,
-    diagnoseAllShellScripts,
-    diagnoseDocument,
-} from "./diagnostics";
+import { diagnoseAllShellScripts, diagnoseDocument } from "./diagnostics";
 import { formatDocument } from "./formatters";
 import { ShellFormatCodeActionProvider } from "./providers";
 import { ServiceManager } from "./services/serviceManager";
@@ -350,11 +346,8 @@ export function activate(context: vscode.ExtensionContext) {
                     );
 
                     // 失效服务缓存
-                    const serviceManager = ServiceManager.getInstance(logger);
+                    const serviceManager = ServiceManager.getInstance();
                     serviceManager.invalidate();
-
-                    // 清除诊断结果缓存
-                    defaultDiagnosticCache.invalidateAll();
 
                     // 重新诊断所有文档
                     const results = await diagnoseAllShellScripts();

@@ -2,7 +2,6 @@
  * 基础类型定义
  * 与业务无关，与 VSCode 无关
  */
-import { Logger } from '../../utils/log';
 
 /**
  * 取消令牌接口
@@ -21,8 +20,6 @@ export interface ExecutorOptions {
     args: string[];
     /** 取消令牌 */
     token?: CancellationToken;
-    /** 日志记录器 */
-    logger?: Logger;
 }
 
 /**

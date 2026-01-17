@@ -3,20 +3,18 @@
  * 封装 shfmt 的所有操作
  */
 
-import { Logger } from '../../../utils/log';
-import { CancellationToken, execute } from '../../executor';
-import { ToolResult } from '../../types';
-import { parseShfmtOutput } from './parser';
+import { CancellationToken, execute } from "../../executor";
+import { ToolResult } from "../../types";
+import { parseShfmtOutput } from "./parser";
 
 /**
  * shfmt 工具类
  */
 export class ShfmtTool {
-
     private commandPath: string;
 
     constructor(commandPath?: string) {
-        this.commandPath = commandPath || 'shfmt';
+        this.commandPath = commandPath || "shfmt";
     }
 
     /**
@@ -27,15 +25,11 @@ export class ShfmtTool {
         options?: Partial<ShfmtFormatOptions>,
     ): Promise<ToolResult> {
         const args = this.buildFormatArgs(options || {}).concat([fileName]);
-        const result = await execute(
-            this.commandPath,
-            {
-                args: args,
-                token: options?.token,
-                logger: options?.logger
-            },
-        );
-        return parseShfmtOutput(result, 'format');
+        const result = await execute(this.commandPath, {
+            args: args,
+            token: options?.token,
+        });
+        return parseShfmtOutput(result, "format");
     }
 
     /**
@@ -43,18 +37,15 @@ export class ShfmtTool {
      */
     async check(
         fileName: string,
-        options?: Partial<ShfmtCheckOptions>
+        options?: Partial<ShfmtCheckOptions>,
     ): Promise<ToolResult> {
         const args = this.buildCheckArgs(options || {}).concat([fileName]);
-        const result = await execute(this.commandPath,
-            {
-                args: args,
-                token: options?.token,
-                logger: options?.logger
-            }
-        );
+        const result = await execute(this.commandPath, {
+            args: args,
+            token: options?.token,
+        });
 
-        return parseShfmtOutput(result, 'check');
+        return parseShfmtOutput(result, "check");
     }
 
     /**
@@ -65,11 +56,11 @@ export class ShfmtTool {
         const args: string[] = [];
 
         if (options.indent !== undefined) {
-            args.push('-i', options.indent.toString());
+            args.push("-i", options.indent.toString());
         }
-        if (options.binaryNextLine) args.push('-bn');
-        if (options.caseIndent) args.push('-ci');
-        if (options.spaceRedirects) args.push('-sr');
+        if (options.binaryNextLine) args.push("-bn");
+        if (options.caseIndent) args.push("-ci");
+        if (options.spaceRedirects) args.push("-sr");
 
         return args;
     }
@@ -79,7 +70,7 @@ export class ShfmtTool {
      */
     private buildCheckArgs(options: ShfmtCheckOptions): string[] {
         const args = this.buildFormatArgs(options);
-        args.push('-d'); // 检查模式
+        args.push("-d"); // 检查模式
         return args;
     }
 
@@ -89,10 +80,16 @@ export class ShfmtTool {
      * @param mode 操作模式：'format' 或 'check'
      * @returns 完整的命令字符串，如 'shfmt -i 2 -bn -ci -sr'
      */
-    buildCommandString(options: ShfmtFormatOptions, mode: 'format' | 'check' = 'format'): string {
-        const command = options.commandPath || 'shfmt';
-        const args = mode === 'check' ? this.buildCheckArgs(options) : this.buildFormatArgs(options);
-        return `${command} ${args.join(' ')}`;
+    buildCommandString(
+        options: ShfmtFormatOptions,
+        mode: "format" | "check" = "format",
+    ): string {
+        const command = options.commandPath || "shfmt";
+        const args =
+            mode === "check"
+                ? this.buildCheckArgs(options)
+                : this.buildFormatArgs(options);
+        return `${command} ${args.join(" ")}`;
     }
 }
 
@@ -112,8 +109,6 @@ export interface ShfmtFormatOptions {
     spaceRedirects?: boolean;
     /** 取消令牌 */
     token?: CancellationToken;
-    /** 日志记录器 */
-    logger?: Logger;
 }
 
 /**

@@ -7,10 +7,10 @@
  * 2. 自动处理配置变化和缓存
  */
 
-import * as vscode from 'vscode';
-import { FormatterAdapter } from '../adapters';
-import { ServiceManager } from '../services';
-import { logger } from '../utils/log';
+import * as vscode from "vscode";
+import { FormatterAdapter } from "../adapters";
+import { ServiceManager } from "../services";
+import { logger } from "../utils/log";
 
 // ==================== 格式化执行层 ====================
 
@@ -22,13 +22,15 @@ import { logger } from '../utils/log';
  */
 async function runFormat(
     document: vscode.TextDocument,
-    token?: vscode.CancellationToken
+    token?: vscode.CancellationToken,
 ): Promise<vscode.TextEdit[]> {
     logger.info(`Start format document: ${document.fileName}`);
 
     // 使用 ServiceManager 获取服务实例（自动处理缓存和配置变化）
-    const serviceManager = ServiceManager.getInstance(logger);
-    const result = await serviceManager.getShfmtService().format(document.fileName, token);
+    const serviceManager = ServiceManager.getInstance();
+    const result = await serviceManager
+        .getShfmtService()
+        .format(document.fileName, token);
 
     // 返回格式化结果（格式化模块不处理诊断）
     return FormatterAdapter.convert(result, document);
@@ -48,7 +50,7 @@ async function runFormat(
 export async function formatDocument(
     document: vscode.TextDocument,
     _options?: vscode.FormattingOptions,
-    _token?: vscode.CancellationToken
+    _token?: vscode.CancellationToken,
 ): Promise<vscode.TextEdit[]> {
     return await runFormat(document, _token);
 }

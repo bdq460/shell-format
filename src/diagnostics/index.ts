@@ -14,10 +14,6 @@ import { PackageInfo, SettingInfo } from "../config";
 import { ServiceManager } from "../services/serviceManager";
 import { ToolExecutionError } from "../tools/errors";
 import { logger } from "../utils/log";
-import { DiagnosticCache } from "./diagnosticCache";
-
-// 创建全局缓存实例
-const diagnosticCache = new DiagnosticCache();
 
 // ==================== 诊断执行层 ====================
 
@@ -33,7 +29,7 @@ async function runShfmtDiagnose(
     logger.info(`Diagnosing document with shfmt: ${fileName}`);
 
     // 使用 ServiceManager 获取服务实例（自动处理缓存和配置变化）
-    const serviceManager = ServiceManager.getInstance(logger);
+    const serviceManager = ServiceManager.getInstance();
     const shfmtResult = await serviceManager
         .getShfmtService()
         .check(fileName, token);
@@ -57,7 +53,7 @@ async function runShellcheckDiagnose(
     logger.info(`Diagnosing document with shellcheck: ${fileName}`);
 
     // 使用 ServiceManager 获取服务实例（自动处理缓存和配置变化）
-    const serviceManager = ServiceManager.getInstance(logger);
+    const serviceManager = ServiceManager.getInstance();
     const shellcheckResult = await serviceManager
         .getShellcheckService()
         .check(fileName, token);
@@ -131,15 +127,6 @@ export async function diagnoseDocument(
         tabSize: SettingInfo.getRealTabSize(),
     };
 
-    // 检查缓存
-    const cached = diagnosticCache.get(document, currentConfig);
-    if (cached) {
-        logger.info(`Cache hit for document: ${document.fileName}`);
-        return cached;
-    }
-
-    logger.info(`Cache missed and start to run diagnose.`);
-
     try {
         // 执行诊断
         const diagnostics = await runDiagnose(document, token);
@@ -188,20 +175,9 @@ export async function diagnoseAllShellScripts(): Promise<
 
     try {
         for (const document of documents) {
-            // 检查缓存
-            const cached = diagnosticCache.get(document, currentConfig);
-            if (cached) {
-                results.set(document.uri, cached);
-                logger.info(`Cache hit for document: ${document.fileName}`);
-                continue;
-            }
-
             // 执行诊断
             const diagnostics = await runDiagnose(document);
             results.set(document.uri, diagnostics);
-
-            // 缓存结果
-            diagnosticCache.set(document, diagnostics, currentConfig);
         }
     } catch (error) {
         // 工具执行错误（如命令不存在）是全局性问题，只在第一个文档上显示错误诊断
@@ -219,9 +195,3 @@ export async function diagnoseAllShellScripts(): Promise<
 
     return results;
 }
-
-/**
- * 导出 DiagnosticCache 供外部使用
- * 使用场景：配置变化时清除缓存
- */
-export { diagnosticCache as defaultDiagnosticCache, DiagnosticCache };

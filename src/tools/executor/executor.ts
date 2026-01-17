@@ -4,6 +4,7 @@
  */
 
 import { spawn } from "child_process";
+import { logger } from "../../utils/log";
 import { ToolExecutionError } from "../errors";
 import { ExecutionResult, ExecutorOptions } from "./types";
 
@@ -15,15 +16,13 @@ export async function execute(
     command: string,
     options: ExecutorOptions,
 ): Promise<ExecutionResult> {
-    const { args, token, logger } = options;
+    const { args, token } = options;
     const fullCommand = `${command} ${args.join(" ")}`;
-
-    logger?.info(`Executing: ${fullCommand}`);
 
     return new Promise((resolve, reject) => {
         if (token?.isCancellationRequested) {
-            logger?.info("Execution cancelled");
-            reject(new Error("Execution cancelled"));
+            logger?.info(`Execute ${fullCommand} cancelled`);
+            reject(new Error(`Execute ${fullCommand} cancelled`));
             return;
         }
 
@@ -43,7 +42,7 @@ export async function execute(
             const stdoutStr = Buffer.concat(stdout).toString();
             const stderrStr = Buffer.concat(stderr).toString();
             logger?.info(
-                `Execution completed with code: ${code}\nstdout: ${stdoutStr}\nstderr: ${stderrStr}`,
+                `Execute ${fullCommand} completed with code: ${code}\nstdout: ${stdoutStr}\nstderr: ${stderrStr}`,
             );
 
             // 记录 stdout 和 stderr（始终记录）
@@ -58,7 +57,7 @@ export async function execute(
         });
 
         process.on("error", (err) => {
-            logger?.error(`Execution error: ${err.message}`);
+            logger?.error(`Execution ${fullCommand} error: ${err.message}`);
             reject(new ToolExecutionError(err as NodeJS.ErrnoException, fullCommand));
         });
 

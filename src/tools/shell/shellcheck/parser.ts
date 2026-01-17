@@ -2,8 +2,8 @@
  * 解析 shellcheck 输出
  */
 
-import { ExecutionResult } from '../../executor';
-import { LinterIssue, ToolResult } from '../../types';
+import { ExecutionResult } from "../../executor";
+import { LinterIssue, ToolResult } from "../../types";
 
 /**
  * 解析 shellcheck 输出
@@ -20,7 +20,7 @@ export function parseShellcheckOutput(result: ExecutionResult): ToolResult {
     const linterIssues = parseIssues(allOutput);
     return {
         success: false,
-        linterIssues
+        linterIssues,
     };
 }
 
@@ -32,10 +32,12 @@ export function parseShellcheckOutput(result: ExecutionResult): ToolResult {
  */
 function parseIssues(output: string): LinterIssue[] {
     const issues: LinterIssue[] = [];
-    const lines = output.split('\n');
+    const lines = output.split("\n");
 
     for (const line of lines) {
-        const match = line.match(/^.+?:(\d+):(\d+): (error|warning|note): (.+) \[(SC\d+)\]$/);
+        const match = line.match(
+            /^.+?:(\d+):(\d+): (error|warning|note): (.+) \[(SC\d+)\]$/,
+        );
 
         if (match) {
             issues.push({
@@ -43,7 +45,7 @@ function parseIssues(output: string): LinterIssue[] {
                 column: parseInt(match[2], 10) - 1,
                 type: match[3] as any,
                 message: match[4],
-                code: match[5]
+                code: match[5],
             });
         }
     }
