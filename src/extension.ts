@@ -305,21 +305,24 @@ export function activate(context: vscode.ExtensionContext) {
     logger.info("Registering document change listener");
     const changeListener = vscode.workspace.onDidChangeTextDocument(
         async (event) => {
+            // @todo暂时先不实现debounceDiagnose, 编辑时在保存之前文件内容是不会发生变化的, 需要使用stdin的方式进行校验
+            logger.info(`Document change event happened! event:${event}`);
+            return;
             // 只处理 shell 语言文件
-            if (event.document.languageId !== PackageInfo.languageId) {
-                return;
-            }
-            // 跳过特殊文件
-            if (shouldSkipFile(event.document.fileName)) {
-                logger.info(
-                    `Skipping change diagnosis for: ${event.document.fileName} (special file)`,
-                );
-                return;
-            }
-            logger.info(
-                `Document change happened, trigger debounceDiagnose for: ${event.document.fileName}`,
-            );
-            debounceDiagnose(event.document, diagnosticCollection);
+            // if (event.document.languageId !== PackageInfo.languageId) {
+            //     return;
+            // }
+            // // 跳过特殊文件
+            // if (shouldSkipFile(event.document.fileName)) {
+            //     logger.info(
+            //         `Skipping change diagnosis for: ${event.document.fileName} (special file)`,
+            //     );
+            //     return;
+            // }
+            // logger.info(
+            //     `Document change happened, trigger debounceDiagnose for: ${event.document.fileName}`,
+            // );
+            // debounceDiagnose(event.document, diagnosticCollection);
         },
     );
 
@@ -401,6 +404,7 @@ export function activate(context: vscode.ExtensionContext) {
 }
 
 /**
+ *
  * 防抖（Debounce）诊断
  * 用于延迟执行文档诊断，避免在用户快速输入时频繁触发诊断操作
  * 在事件被连续触发时，只在最后一次触发后的指定时间间隔结束后才执行回调函数。

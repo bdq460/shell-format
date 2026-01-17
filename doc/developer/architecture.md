@@ -18,24 +18,22 @@ Shell Format 是一个基于 VSCode 扩展 API 的 Shell 脚本格式化和诊�
 
 **跳过模式**：
 
-| 模式 | 说明 | 示例 |
-|-----|------|------|
+| 模式       | 说明         | 示例             |
+| ---------- | ------------ | ---------------- |
 | `/\.git$/` | Git 冲突文件 | `example.sh.git` |
-| `/\.swp$/` | Vim 临时文件 | `file.sh.swp` |
-| `/\.swo$/` | Vim 交换文件 | `file.sh.swo` |
-| `/~$/` | 备份文件 | `file.sh~` |
-| `/\.tmp$/` | 临时文件 | `file.sh.tmp` |
-| `/\.bak$/` | 备份文件 | `file.sh.bak` |
+| `/\.swp$/` | Vim 临时文件 | `file.sh.swp`    |
+| `/\.swo$/` | Vim 交换文件 | `file.sh.swo`    |
+| `/~$/`     | 备份文件     | `file.sh~`       |
+| `/\.tmp$/` | 临时文件     | `file.sh.tmp`    |
+| `/\.bak$/` | 备份文件     | `file.sh.bak`    |
 
 **示例代码**：
 
 ```typescript
 function shouldSkipFile(fileName: string): boolean {
-    const baseName = path.basename(fileName);
-    const skipPatterns = [
-        /\.git$/, /\.swp$/, /\.swo$/, /~$/, /\.tmp$/, /\.bak$/
-    ];
-    return skipPatterns.some(pattern => pattern.test(baseName));
+  const baseName = path.basename(fileName);
+  const skipPatterns = [/\.git$/, /\.swp$/, /\.swo$/, /~$/, /\.tmp$/, /\.bak$/];
+  return skipPatterns.some((pattern) => pattern.test(baseName));
 }
 ```
 
@@ -53,14 +51,14 @@ function shouldSkipFile(fileName: string): boolean {
 │  - 管理生命周期                                  │
 └─────────────────────────────────────────────────┘
                     ↓
-    ┌───────────────┼───────────────┐
-    ↓               ↓               ↓
-┌─────────┐    ┌─────────┐    ┌─────────┐
-│commands │    │diagnostics│   │formatters│
-└─────────┘    └─────────┘    └─────────┘
-    ↓               ↓               ↓
+    ┌───────────┼───────────┬───────────────┐
+    ↓           ↓           ↓               ↓
+┌─────────┐ ┌─────────┐ ┌─────────┐ ┌─────────┐
+│commands │ │diagnostics││formatters││services │
+└─────────┘ └─────────┘ └─────────┘ └─────────┘
+    ↓           ↓           ↓               ↓
 ┌─────────────────────────────────────────┐
-│              utils (工具层)               │
+│              tools (工具层)               │
 │  - 日志系统                                │
 │  - 配置管理                                │
 │  - 外部命令执行                            │
@@ -74,24 +72,25 @@ function shouldSkipFile(fileName: string): boolean {
 ```text
 extension.ts
     ↓
-commands/
+commands/  diagnostics/  formatters/
+    ↓           ↓              ↓
+services/ (服务层) ←──────────────────────────┘
     ↓
-diagnostics/ ──────→ formatters/ ──────→ providers/
-    ↓                   ↓                    ↓
-utils/ ◄──────────────────────────────────────┘
+tools/ (工具层)
 ```
 
 - `extension.ts` 依赖所有功能模块
-- 功能模块可以依赖 `utils/`
-- 功能模块之间相互独立
+- 业务模块（commands/、diagnostics/、formatters/）依赖 `services/`
+- `services/` 依赖 `tools/`
+- 业务模块之间相互独立
 
 ### 3. 关注点分离
 
-| 层级 | 职责 | 示例 |
-|-----|------|------|
-| **入口层** | 注册和协调 | `extension.ts` |
+| 层级       | 职责         | 示例                                       |
+| ---------- | ------------ | ------------------------------------------ |
+| **入口层** | 注册和协调   | `extension.ts`                             |
 | **业务层** | 实现具体功能 | `commands/`, `diagnostics/`, `formatters/` |
-| **工具层** | 提供通用能力 | `utils/` |
+| **工具层** | 提供通用能力 | `utils/`                                   |
 
 ## 核心模块详解
 
@@ -153,7 +152,67 @@ export function activate(context: vscode.ExtensionContext) {
 2. **资源管理**：所有 Disposable 对象都注册到 context.subscriptions
 3. **统一入口**：所有初始化逻辑集中在 `activate()` 函数中
 
-### 2. 命令模块 (commands/)
+### 2. 服务层 (services/)
+
+**职责**：
+
+- 管理服务实例的单例，避免重复创建
+- 封装外部工具调用，提供统一的服务接口
+- 支持配置变化检测和自动失效
+
+**文件结构**：
+
+```tree
+services/
+├── index.ts              # 服务层入口
+├── serviceManager.ts      # 服务单例管理器
+├── shfmtService.ts        # 格式化服务
+└── shellcheckService.ts  # 诊断服务
+```
+
+**核心设计**：
+
+```typescript
+export class ServiceManager {
+  private static instance: ServiceManager | null = null;
+  private shfmtService: ShfmtService | null = null;
+  private shellcheckService: ShellcheckService | null = null;
+
+  static getInstance(): ServiceManager {
+    if (!ServiceManager.instance) {
+      ServiceManager.instance = new ServiceManager();
+    }
+    return ServiceManager.instance;
+  }
+
+  getShfmtService(): ShfmtService {
+    if (!this.shfmtService) {
+      const config = SettingInfo.getConfigSnapshot();
+      this.shfmtService = new ShfmtService(
+        config.shfmtPath,
+        SettingInfo.getRealTabSize(),
+      );
+    }
+    return this.shfmtService;
+  }
+
+  invalidate(): void {
+    this.shfmtService = null;
+    this.shellcheckService = null;
+  }
+}
+```
+
+**设计要点**：
+
+1. **单例模式**：确保服务实例全局唯一
+2. **配置缓存**：使用 SettingInfo 获取配置快照
+3. **自动失效**：配置变化时调用 `invalidate()` 清空缓存
+4. **性能优化**：避免重复创建实例和频繁读取配置
+
+> 有关服务层和配置管理的详细说明，请参考 [../ARCHITECTURE_OPTIMIZATION.md](../ARCHITECTURE_OPTIMIZATION.md)。
+
+### 4. 命令模块 (commands/)
 
 **职责**：
 
@@ -187,7 +246,7 @@ VSCode 应用编辑
 
 > 有关命令和 CodeAction 的详细 API 说明，请参考 [../vscode/extension-api.md](../vscode/extension-api.md)。
 
-### 3. 诊断模块 (diagnostics/)
+### 5. 诊断模块 (diagnostics/)
 
 **职责**：
 
@@ -197,12 +256,12 @@ VSCode 应用编辑
 
 **诊断触发时机**：
 
-| 触发条件 | 监听器 | 防抖 |
-|---------|--------|------|
-| 文档保存 | `onDidSaveTextDocument` | ❌ 否 |
-| 文档打开 | `onDidOpenTextDocument` | ❌ 否 |
-| 文档变化 | `onDidChangeTextDocument` | ✅ 是（500ms） |
-| 配置变更 | `onDidChangeConfiguration` | ❌ 否 |
+| 触发条件 | 监听器                     | 防抖           |
+| -------- | -------------------------- | -------------- |
+| 文档保存 | `onDidSaveTextDocument`    | ❌ 否          |
+| 文档打开 | `onDidOpenTextDocument`    | ❌ 否          |
+| 文档变化 | `onDidChangeTextDocument`  | ✅ 是（500ms） |
+| 配置变更 | `onDidChangeConfiguration` | ❌ 否          |
 
 **文件结构**：
 
@@ -236,15 +295,12 @@ diagnoseDocument()
 ```typescript
 // 并行执行多个诊断
 const [shellcheckDiagnostics, shfmtDiagnostics] = await Promise.all([
-    checkWithShellcheck(document),
-    checkWithShfmt(document)
+  checkWithShellcheck(document),
+  checkWithShfmt(document),
 ]);
 
 // 合并结果
-const allDiagnostics = [
-    ...shellcheckDiagnostics,
-    ...shfmtDiagnostics
-];
+const allDiagnostics = [...shellcheckDiagnostics, ...shfmtDiagnostics];
 
 // 更新诊断集合
 diagnosticCollection.set(document.uri, allDiagnostics);
@@ -255,19 +311,22 @@ diagnosticCollection.set(document.uri, allDiagnostics);
 ```typescript
 let debounceTimer: NodeJS.Timeout | undefined;
 
-function debounceDiagnose(document: vscode.TextDocument, delay: number = 500): void {
-    if (debounceTimer) {
-        clearTimeout(debounceTimer);
-    }
-    debounceTimer = setTimeout(() => {
-        diagnoseDocument(document);
-    }, delay);
+function debounceDiagnose(
+  document: vscode.TextDocument,
+  delay: number = 500,
+): void {
+  if (debounceTimer) {
+    clearTimeout(debounceTimer);
+  }
+  debounceTimer = setTimeout(() => {
+    diagnoseDocument(document);
+  }, delay);
 }
 ```
 
 > 有关防抖机制的详细说明，请参考 [../vscode/extension-api.md](../vscode/extension-api.md)。
 
-### 4. 格式化模块 (formatters/)
+### 6. 格式化模块 (formatters/)
 
 **职责**：
 
@@ -286,44 +345,44 @@ formatters/
 
 ```typescript
 export async function formatDocument(
-    document: vscode.TextDocument,
-    options: vscode.FormattingOptions,
-    token?: vscode.CancellationToken
+  document: vscode.TextDocument,
+  options: vscode.FormattingOptions,
+  token?: vscode.CancellationToken,
 ): Promise<vscode.TextEdit[]> {
-    const content = document.getText();
-    const args = ConfigManager.buildShfmtArgs();
+  const content = document.getText();
+  const args = ConfigManager.buildShfmtArgs();
 
-    return new Promise((resolve, reject) => {
-        const shfmt = spawn('shfmt', args);
+  return new Promise((resolve, reject) => {
+    const shfmt = spawn("shfmt", args);
 
-        // 监听输出
-        shfmt.stdout.on('data', (chunk) => {
-            // 收集格式化后的内容
-        });
-
-        // 监听进程结束
-        shfmt.on('close', (code) => {
-            if (code === 0) {
-                const formatted = Buffer.concat(stdout).toString();
-                const fullRange = new vscode.Range(
-                    document.positionAt(0),
-                    document.positionAt(content.length)
-                );
-                resolve([vscode.TextEdit.replace(fullRange, formatted)]);
-            } else {
-                resolve([]);
-            }
-        });
-
-        // 支持取消
-        token?.onCancellationRequested(() => {
-            shfmt.kill();
-        });
-
-        // 写入输入
-        shfmt.stdin.write(content);
-        shfmt.stdin.end();
+    // 监听输出
+    shfmt.stdout.on("data", (chunk) => {
+      // 收集格式化后的内容
     });
+
+    // 监听进程结束
+    shfmt.on("close", (code) => {
+      if (code === 0) {
+        const formatted = Buffer.concat(stdout).toString();
+        const fullRange = new vscode.Range(
+          document.positionAt(0),
+          document.positionAt(content.length),
+        );
+        resolve([vscode.TextEdit.replace(fullRange, formatted)]);
+      } else {
+        resolve([]);
+      }
+    });
+
+    // 支持取消
+    token?.onCancellationRequested(() => {
+      shfmt.kill();
+    });
+
+    // 写入输入
+    shfmt.stdin.write(content);
+    shfmt.stdin.end();
+  });
 }
 ```
 
@@ -347,7 +406,7 @@ spawn('shfmt', args)
 返回给 VSCode 应用
 ```
 
-### 5. 提供者模块 (providers/)
+### 7. 提供者模块 (providers/)
 
 **职责**：
 
@@ -383,46 +442,46 @@ provideCodeActions()
 
 ```typescript
 export class ShellFormatCodeActionProvider
-    implements vscode.CodeActionProvider {
+  implements vscode.CodeActionProvider
+{
+  provideCodeActions(
+    document: vscode.TextDocument,
+    range: vscode.Range | vscode.Selection,
+    context: vscode.CodeActionContext,
+    token: vscode.CancellationToken,
+  ): vscode.ProviderResult<vscode.CodeAction[]> {
+    const actions: vscode.CodeAction[] = [];
 
-    provideCodeActions(
-        document: vscode.TextDocument,
-        range: vscode.Range | vscode.Selection,
-        context: vscode.CodeActionContext,
-        token: vscode.CancellationToken
-    ): vscode.ProviderResult<vscode.CodeAction[]> {
-        const actions: vscode.CodeAction[] = [];
+    // 单个问题修复
+    const fixAction = new vscode.CodeAction(
+      "Fix this issue with shell-format",
+      vscode.CodeActionKind.QuickFix,
+    );
+    fixAction.command = {
+      command: "shell-format.formatDocument",
+      title: "Fix this issue",
+    };
+    actions.push(fixAction);
 
-        // 单个问题修复
-        const fixAction = new vscode.CodeAction(
-            'Fix this issue with shell-format',
-            vscode.CodeActionKind.QuickFix
-        );
-        fixAction.command = {
-            command: 'shell-format.formatDocument',
-            title: 'Fix this issue'
-        };
-        actions.push(fixAction);
+    // 一键修复所有问题
+    const fixAllAction = new vscode.CodeAction(
+      "Fix all with shell-format",
+      vscode.CodeActionKind.SourceFixAll,
+    );
+    fixAllAction.command = {
+      command: "shell-format.fixAllProblems",
+      title: "Fix all problems",
+    };
+    actions.push(fixAllAction);
 
-        // 一键修复所有问题
-        const fixAllAction = new vscode.CodeAction(
-            'Fix all with shell-format',
-            vscode.CodeActionKind.SourceFixAll
-        );
-        fixAllAction.command = {
-            command: 'shell-format.fixAllProblems',
-            title: 'Fix all problems'
-        };
-        actions.push(fixAllAction);
-
-        return actions;
-    }
+    return actions;
+  }
 }
 ```
 
 > 有关 CodeActionProvider、QuickFix 和 SourceFixAll 的详细说明，请参考 [../vscode/extension-api.md](../vscode/extension-api.md)。
 
-### 6. 工具模块 (utils/)
+### 8. 工具模块 (tools/)
 
 **职责**：
 
@@ -432,13 +491,18 @@ export class ShellFormatCodeActionProvider
 
 **文件结构**：
 
-```tree
-utils/
-├── logger.ts                  # 日志系统
-├── extensionInfo.ts           # 配置管理
-├── messages.ts                # 消息定义
-├── shell.ts                   # Shell 工具
-└── spawnErrorHandler.ts       # 错误处理
+```text
+tools/
+├── index.ts                  # 工具层入口
+├── errors.ts                 # 错误定义
+├── types.ts                  # 类型定义
+├── executor/                 # 外部命令执行器
+│   ├── executor.ts           # 执行器实现
+│   ├── types.ts             # 执行器类型
+│   └── index.ts             # 导出
+└── shell/                    # Shell 工具封装
+    ├── shellcheck/           # shellcheck 工具
+    └── shfmt/               # shfmt 工具
 ```
 
 #### 日志系统 (logger.ts)
@@ -485,34 +549,36 @@ export function logger.info(message: string): void {
 
 ```typescript
 export class PackageInfo {
-    static readonly extensionName = 'shell-format';
-    static readonly languageId = 'shellscript';
-    static readonly defaultShfmtPath = 'shfmt';
-    static readonly defaultShfmtArgs = ['-i', '2', '-bn', '-ci', '-sr'];
+  static readonly extensionName = "shell-format";
+  static readonly languageId = "shellscript";
+  static readonly defaultShfmtPath = "shfmt";
+  static readonly defaultShfmtArgs = ["-i", "2", "-bn", "-ci", "-sr"];
 }
 
 export class ConfigManager {
-    static getShfmtPath(): string {
-        const config = vscode.workspace.getConfiguration('shell-format');
-        return config.get<string>('shfmtPath', PackageInfo.defaultShfmtPath);
-    }
+  static getShfmtPath(): string {
+    const config = vscode.workspace.getConfiguration("shell-format");
+    return config.get<string>("shfmtPath", PackageInfo.defaultShfmtPath);
+  }
 
-    static buildShfmtArgs(): string[] {
-        return PackageInfo.defaultShfmtArgs;
-    }
+  static buildShfmtArgs(): string[] {
+    return PackageInfo.defaultShfmtArgs;
+  }
 
-    static getLogOutput(): string {
-        const config = vscode.workspace.getConfiguration('shell-format');
-        return config.get<string>('logOutput', 'off');
-    }
+  static getLogOutput(): string {
+    const config = vscode.workspace.getConfiguration("shell-format");
+    return config.get<string>("logOutput", "off");
+  }
 
-    static isConfigurationChanged(event: vscode.ConfigurationChangeEvent): boolean {
-        // 检查配置是否变化
-        if (event.affectsConfiguration('shell-format')) {
-            return true;
-        }
-        return false;
+  static isConfigurationChanged(
+    event: vscode.ConfigurationChangeEvent,
+  ): boolean {
+    // 检查配置是否变化
+    if (event.affectsConfiguration("shell-format")) {
+      return true;
     }
+    return false;
+  }
 }
 ```
 
@@ -524,11 +590,11 @@ export class ConfigManager {
 
 VSCode 使用 Provider 模式来扩展编辑器功能：
 
-| Provider | 功能 | 接口 |
-|----------|------|------|
-| DocumentFormattingEditProvider | 文档格式化 | `provideDocumentFormattingEdits()` |
+| Provider                            | 功能       | 接口                                    |
+| ----------------------------------- | ---------- | --------------------------------------- |
+| DocumentFormattingEditProvider      | 文档格式化 | `provideDocumentFormattingEdits()`      |
 | DocumentRangeFormattingEditProvider | 选区格式化 | `provideDocumentRangeFormattingEdits()` |
-| CodeActionsProvider | 代码操作 | `provideCodeActions()` |
+| CodeActionsProvider                 | 代码操作   | `provideCodeActions()`                  |
 
 **优势**：
 
@@ -544,31 +610,31 @@ VSCode 使用 Provider 模式来扩展编辑器功能：
 
 ```typescript
 // 文档保存时触发
-const saveListener = vscode.workspace.onDidSaveTextDocument(document => {
-    if (isShellScript(document)) {
-        diagnoseDocument(document);
-    }
+const saveListener = vscode.workspace.onDidSaveTextDocument((document) => {
+  if (isShellScript(document)) {
+    diagnoseDocument(document);
+  }
 });
 
 // 文档打开时触发
-const openListener = vscode.workspace.onDidOpenTextDocument(document => {
-    if (isShellScript(document)) {
-        diagnoseDocument(document);
-    }
+const openListener = vscode.workspace.onDidOpenTextDocument((document) => {
+  if (isShellScript(document)) {
+    diagnoseDocument(document);
+  }
 });
 
 // 文档变化时防抖触发
-const changeListener = vscode.workspace.onDidChangeTextDocument(event => {
-    if (isShellScript(event.document)) {
-        debounceDiagnose(event.document);
-    }
+const changeListener = vscode.workspace.onDidChangeTextDocument((event) => {
+  if (isShellScript(event.document)) {
+    debounceDiagnose(event.document);
+  }
 });
 
 // 配置变更时触发
-const configListener = vscode.workspace.onDidChangeConfiguration(event => {
-    if (isConfigurationChanged(event)) {
-        diagnoseAllDocuments();
-    }
+const configListener = vscode.workspace.onDidChangeConfiguration((event) => {
+  if (isConfigurationChanged(event)) {
+    diagnoseAllDocuments();
+  }
 });
 ```
 
@@ -581,13 +647,16 @@ const configListener = vscode.workspace.onDidChangeConfiguration(event => {
 ```typescript
 let debounceTimer: NodeJS.Timeout | undefined;
 
-function debounceDiagnose(document: vscode.TextDocument, delay: number = 500): void {
-    if (debounceTimer) {
-        clearTimeout(debounceTimer);
-    }
-    debounceTimer = setTimeout(() => {
-        diagnoseDocument(document);
-    }, delay);
+function debounceDiagnose(
+  document: vscode.TextDocument,
+  delay: number = 500,
+): void {
+  if (debounceTimer) {
+    clearTimeout(debounceTimer);
+  }
+  debounceTimer = setTimeout(() => {
+    diagnoseDocument(document);
+  }, delay);
 }
 ```
 
@@ -607,31 +676,31 @@ function debounceDiagnose(document: vscode.TextDocument, delay: number = 500): v
 
 ```typescript
 export async function checkWithShellcheck(
-    document: vscode.TextDocument
+  document: vscode.TextDocument,
 ): Promise<vscode.Diagnostic[]> {
-    return new Promise((resolve) => {
-        const shellcheck = spawn('shellcheck', args);
-        let stdout: Buffer[] = [];
-        let stderr: Buffer[] = [];
+  return new Promise((resolve) => {
+    const shellcheck = spawn("shellcheck", args);
+    let stdout: Buffer[] = [];
+    let stderr: Buffer[] = [];
 
-        shellcheck.stdout.on('data', (chunk) => {
-            stdout.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
-        });
-
-        shellcheck.stderr.on('data', (chunk) => {
-            stderr.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
-        });
-
-        shellcheck.on('close', (code) => {
-            const diagnostics = parseShellcheckOutput(document, stdout, stderr);
-            resolve(diagnostics);
-        });
-
-        shellcheck.on('error', (err) => {
-            console.error('Shellcheck error:', err);
-            resolve([]);
-        });
+    shellcheck.stdout.on("data", (chunk) => {
+      stdout.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
     });
+
+    shellcheck.stderr.on("data", (chunk) => {
+      stderr.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
+    });
+
+    shellcheck.on("close", (code) => {
+      const diagnostics = parseShellcheckOutput(document, stdout, stderr);
+      resolve(diagnostics);
+    });
+
+    shellcheck.on("error", (err) => {
+      console.error("Shellcheck error:", err);
+      resolve([]);
+    });
+  });
 }
 ```
 
@@ -664,17 +733,17 @@ export async function checkWithShellcheck(
 
 ```typescript
 export async function formatDocument(
-    document: vscode.TextDocument,
-    token?: vscode.CancellationToken
+  document: vscode.TextDocument,
+  token?: vscode.CancellationToken,
 ): Promise<vscode.TextEdit[]> {
-    const shfmt = spawn('shfmt', args);
+  const shfmt = spawn("shfmt", args);
 
-    token?.onCancellationRequested(() => {
-        shfmt.kill();
-        reject(new vscode.CancellationError());
-    });
+  token?.onCancellationRequested(() => {
+    shfmt.kill();
+    reject(new vscode.CancellationError());
+  });
 
-    // ...
+  // ...
 }
 ```
 
@@ -685,23 +754,23 @@ export async function formatDocument(
 ### 1. 外部命令错误
 
 ```typescript
-shellcheck.on('error', (err) => {
-    // 命令不存在或无法执行
-    console.error('Shellcheck error:', err.message);
-    resolve([]);
+shellcheck.on("error", (err) => {
+  // 命令不存在或无法执行
+  console.error("Shellcheck error:", err.message);
+  resolve([]);
 });
 ```
 
 ### 2. 格式化错误
 
 ```typescript
-shfmt.on('close', (code) => {
-    if (code === 0) {
-        // 格式化成功
-    } else {
-        // 格式化失败，返回空数组
-        resolve([]);
-    }
+shfmt.on("close", (code) => {
+  if (code === 0) {
+    // 格式化成功
+  } else {
+    // 格式化失败，返回空数组
+    resolve([]);
+  }
 });
 ```
 
@@ -709,8 +778,8 @@ shfmt.on('close', (code) => {
 
 ```typescript
 token?.onCancellationRequested(() => {
-    shfmt.kill();
-    reject(new vscode.CancellationError());
+  shfmt.kill();
+  reject(new vscode.CancellationError());
 });
 ```
 
@@ -721,22 +790,22 @@ token?.onCancellationRequested(() => {
 ```typescript
 // 在 diagnostics/ 下创建新文件
 export async function checkWithMyTool(
-    document: vscode.TextDocument
+  document: vscode.TextDocument,
 ): Promise<vscode.Diagnostic[]> {
-    // 实现诊断逻辑
-    return diagnostics;
+  // 实现诊断逻辑
+  return diagnostics;
 }
 
 // 在 index.ts 中调用
 export async function diagnoseDocument(
-    document: vscode.TextDocument
+  document: vscode.TextDocument,
 ): Promise<void> {
-    const diagnostics = [
-        ...(await checkWithShellcheck(document)),
-        ...(await checkWithShfmt(document)),
-        ...(await checkWithMyTool(document)),  // 添加新诊断器
-    ];
-    diagnosticCollection.set(document.uri, diagnostics);
+  const diagnostics = [
+    ...(await checkWithShellcheck(document)),
+    ...(await checkWithShfmt(document)),
+    ...(await checkWithMyTool(document)), // 添加新诊断器
+  ];
+  diagnosticCollection.set(document.uri, diagnostics);
 }
 ```
 
@@ -745,21 +814,18 @@ export async function diagnoseDocument(
 ```typescript
 // 在 commands/ 下创建新文件
 export function registerMyCommand(): vscode.Disposable {
-    return vscode.commands.registerCommand(
-        'shell-format.myCommand',
-        () => {
-            // 实现命令逻辑
-        }
-    );
+  return vscode.commands.registerCommand("shell-format.myCommand", () => {
+    // 实现命令逻辑
+  });
 }
 
 // 在 index.ts 中注册
 export function registerAllCommands(): vscode.Disposable[] {
-    return [
-        registerFormatCommand(),
-        registerFixCommand(),
-        registerMyCommand(),  // 注册新命令
-    ];
+  return [
+    registerFormatCommand(),
+    registerFixCommand(),
+    registerMyCommand(), // 注册新命令
+  ];
 }
 ```
 
@@ -807,6 +873,60 @@ export class ConfigManager {
 - 测试用户交互流程
 - 测试扩展激活和停用
 
+## 架构演进
+
+### 服务层引入
+
+在架构演进中，引入了服务层（`services/`）以提升性能和可维护性：
+
+**关键改进**：
+
+1. **单例管理** - ServiceManager 管理服务实例，避免重复创建
+2. **配置缓存** - 使用 SettingInfo 实现配置快照和自动失效
+3. **性能优化** - 诊断结果缓存、并行诊断、防抖机制
+4. **细粒度配置检测** - 只检测真正影响工具行为的配置项
+
+**从直接访问到服务层的转变**：
+
+```typescript
+// 旧架构：直接调用工具
+const shfmtPath = ConfigManager.getShfmtPath();
+const shfmt = spawn("shfmt", ["-i", "2"]);
+
+// 新架构：通过服务层
+const serviceManager = ServiceManager.getInstance();
+const shfmtService = serviceManager.getShfmtService();
+const result = await shfmtService.format(fileName, token);
+```
+
+> 详细的架构优化实施说明，请参考 [../ARCHITECTURE_OPTIMIZATION.md](../ARCHITECTURE_OPTIMIZATION.md)。
+
+### 配置管理演进
+
+**旧架构**：
+
+- 直接使用 `ConfigManager` 访问配置
+- 每次调用都读取 VSCode API
+- 缺少配置缓存机制
+
+**新架构**：
+
+- 使用 `SettingInfo` 统一管理配置
+- 实现配置快照和自动失效
+- 配置变化时自动失效服务缓存
+
+```typescript
+// 新架构：配置快照机制
+const config = SettingInfo.getConfigSnapshot();
+// config 包含所有配置的快照，避免频繁调用 VSCode API
+
+// 配置变化时
+SettingInfo.refreshCache();
+serviceManager.invalidate();
+```
+
+---
+
 ## 总结
 
 Shell Format 采用模块化、可扩展的架构设计，通过清晰的模块划分和单向依赖关系，实现了高内聚、低耦合的代码结构。项目充分利用了 VSCode Extension API 的 Provider 模式和事件驱动机制，提供了良好的用户体验和开发者体验。
@@ -816,10 +936,11 @@ Shell Format 采用模块化、可扩展的架构设计，通过清晰的模块�
 - ✅ 模块化设计，易于维护和扩展
 - ✅ 单向依赖，避免循环依赖
 - ✅ 关注点分离，职责清晰
+- ✅ 服务层模式，统一服务接口
 - ✅ 异步执行，不阻塞 UI
 - ✅ 完善的错误处理和日志系统
+- ✅ 性能优化，提升响应速度
 
 **相关文档**：
 
-- [../vscode/extension-api.md](../vscode/extension-api.md) - VSCode 扩展开发 API 详细说明
 - [package.json](../../package.json) - 扩展配置文件

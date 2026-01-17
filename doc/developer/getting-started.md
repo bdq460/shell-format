@@ -6,12 +6,12 @@
 
 ### 必需工具
 
-| 工具 | 最低版本 | 说明 |
-|-----|---------|------|
-| **Node.js** | >= 16.x | JavaScript 运行时 |
-| **npm** | >= 8.x | 包管理器 |
-| **VSCode** | >= 1.74.0 | 开发环境 |
-| **TypeScript** | >= 5.0 | 编译器 |
+| 工具           | 最低版本  | 说明              |
+| -------------- | --------- | ----------------- |
+| **Node.js**    | >= 16.x   | JavaScript 运行时 |
+| **npm**        | >= 8.x    | 包管理器          |
+| **VSCode**     | >= 1.74.0 | 开发环境          |
+| **TypeScript** | >= 5.0    | 编译器            |
 
 ### 推荐工具
 
@@ -69,6 +69,8 @@ VSCode API
     ↓
 扩展代码
     ↓
+服务层（ServiceManager）
+    ↓
 spawn 调用外部工具
     ↓
 shfmt / shellcheck
@@ -77,6 +79,13 @@ shfmt / shellcheck
     ↓
 更新 VSCode UI
 ```
+
+### 架构特点
+
+- **服务层模式** - 使用 ServiceManager 管理服务实例，提供统一的服务接口
+- **单例管理** - 避免重复创建服务实例，提升性能
+- **配置缓存** - 基于 SettingInfo 实现配置快照和自动失效
+- **性能优化** - 诊断结果缓存、并行诊断、防抖机制
 
 ---
 
@@ -175,15 +184,12 @@ npm run lint
 在 `src/commands/` 下创建 `helloCommand.ts`:
 
 ```typescript
-import * as vscode from 'vscode';
+import * as vscode from "vscode";
 
 export function registerHelloCommand(): vscode.Disposable {
-    return vscode.commands.registerCommand(
-        'shell-format.helloWorld',
-        () => {
-            vscode.window.showInformationMessage('Hello, World!');
-        }
-    );
+  return vscode.commands.registerCommand("shell-format.helloWorld", () => {
+    vscode.window.showInformationMessage("Hello, World!");
+  });
 }
 ```
 
@@ -192,9 +198,9 @@ export function registerHelloCommand(): vscode.Disposable {
 在 `src/commands/index.ts` 中添加:
 
 ```typescript
-export * from './formatCommand';
-export * from './fixCommand';
-export * from './helloCommand';  // 新增
+export * from "./formatCommand";
+export * from "./fixCommand";
+export * from "./helloCommand"; // 新增
 ```
 
 #### 步骤 3: 注册命令
@@ -202,13 +208,13 @@ export * from './helloCommand';  // 新增
 在 `src/extension.ts` 中添加:
 
 ```typescript
-import { registerHelloCommand } from './commands';
+import { registerHelloCommand } from "./commands";
 
 export function activate(context: vscode.ExtensionContext) {
-    // ... 现有代码
+  // ... 现有代码
 
-    const helloCommand = registerHelloCommand();
-    context.subscriptions.push(helloCommand);
+  const helloCommand = registerHelloCommand();
+  context.subscriptions.push(helloCommand);
 }
 ```
 
@@ -225,22 +231,29 @@ export function activate(context: vscode.ExtensionContext) {
 
 ### 添加新功能
 
-参考 [开发者快速入门](README.md) 中的"添加新功能"章节。
+参考本指南"第一个任务"章节了解如何添加新命令。
 
 ### 修改配置
 
 1. 在 `package.json` 的 `configuration` 中添加配置项
-2. 在 `src/utils/extensionInfo.ts` 中添加访问方法
+2. 在 `src/config/settingInfo.ts` 中添加访问方法，使用 SettingInfo 统一管理配置
 
 ### 调试外部命令
 
-```typescript
-import { log } from './utils/logger';
+使用服务层进行调试：
 
-log('Command: shfmt');
-log('Args: -i 2 -bn -ci -sr');
-// ... 执行命令
-log('Result: success');
+```typescript
+import { logger } from "../utils/log";
+import { ServiceManager } from "../services/serviceManager";
+
+// 获取服务实例
+const serviceManager = ServiceManager.getInstance();
+const shfmtService = serviceManager.getShfmtService();
+
+// 执行操作并查看日志
+logger.info("Executing format operation");
+const result = await shfmtService.format("/path/to/file.sh");
+logger.info(`Result: ${result.success}`);
 ```
 
 ---
@@ -250,9 +263,8 @@ log('Result: success');
 完成快速开始后，建议:
 
 1. 阅读 [架构设计文档](architecture.md) 了解项目架构
-2. 阅读 [package.json 配置说明](../vscode/package-json.md) 了解扩展配置
-3. 阅读 [spawn 使用指南](../tools/spawn.md) 了解如何调用外部命令
-4. 查看 [源代码](../../src/) 了解具体实现
+2. 阅读 [架构优化总结](../ARCHITECTURE_OPTIMIZATION.md) 了解性能优化实施细节
+3. 查看 [源代码](../../src/) 了解具体实现
 
 ---
 
@@ -268,8 +280,6 @@ log('Result: success');
 
 ## 相关资源
 
-- [开发者快速入门](README.md)
-- [架构设计文档](architecture.md)
-- [package.json 配置说明](../vscode/package-json.md)
-- [spawn 使用指南](../tools/spawn.md)
-- [VSCode 扩展开发文档](https://code.visualstudio.com/api)
+- [架构设计文档](architecture.md) - 项目架构详细说明
+- [架构优化总结](../ARCHITECTURE_OPTIMIZATION.md) - 性能优化实施细节
+- [VSCode 扩展开发文档](https://code.visualstudio.com/api) - 官方 API 文档

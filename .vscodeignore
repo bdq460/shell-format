@@ -10,8 +10,11 @@ node_modules/**
 # 测试相关
 test/**
 .pytest_cache/**
+tsconfig.test.json
 
 # 开发文档
+README_EN.md
+README.md.bak
 doc/**
 
 # 扩展文件
@@ -31,3 +34,4 @@ script/**
 
 # 其他隐藏文件
 .*
+*.bak

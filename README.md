@@ -1,318 +1,103 @@
 # Shell Format
 
-> Intelligent Shell script formatting and checking tool based on shfmt and shellcheck
+> 基于 shfmt 和 shellcheck 的智能 Shell 脚本格式化和检查工具
 
-## Quick Start
+**English Version**: [README_EN.md](README_EN.md)
 
-### Feature Overview
+## 开发者快速开始
 
-- **Smart Formatting** - Automatically format Shell scripts with shfmt
-- **Error Detection** - Detect syntax and semantic errors with shellcheck
-- **Automatic Diagnosis** - Automatic checking when opening, saving, or editing
-- **Quick Fixes** - One-click fix for formatting issues
-- **Detailed Logs** - Timestamped operation logs
+### 项目概述
 
-## Configuration Options
+Shell Format 是一个 VSCode 扩展，提供 Shell 脚本的格式化和诊断功能。采用模块化架构，服务层封装了外部工具调用，支持性能优化（缓存、并行诊断）和细粒度配置管理。
 
-### Complete Configuration Example
+### 核心功能
 
-```json
-{
-  "shell-format.shellcheckPath": "shellcheck",
-  "shell-format.shfmtPath": "shfmt",
-  "shell-format.tabSize": 2,
-  "shell-format.logOutput": "off",
-  "shell-format.onError": "showProblem"
-}
+- **格式化** - 使用 shfmt 自动格式化 Shell 脚本
+- **诊断** - 使用 shellcheck 和 shfmt 检测语法和语义错误
+- **自动诊断** - 打开、保存或编辑时自动检查（500ms 防抖）
+- **快速修复** - 一键修复格式问题
+
+### 开发文档
+
+详细的技术文档请查看 [doc/developer/](doc/developer/)：
+
+- **[快速开始指南](doc/developer/getting-started.md)** - 开发环境搭建、编译、调试
+- **[架构设计文档](doc/developer/architecture.md)** - 架构设计、模块划分、扩展性指南
+
+### 项目结构
+
+```text
+├── src/
+│   ├── extension.ts          # 扩展入口
+│   ├── services/             # 服务层（新增）
+│   │   ├── serviceManager.ts      # 服务单例管理器
+│   │   ├── shfmtService.ts        # 格式化服务
+│   │   └── shellcheckService.ts  # 诊断服务
+│   ├── diagnostics/          # 诊断模块
+│   ├── formatters/           # 格式化模块
+│   ├── providers/            # 提供者模块
+│   ├── commands/             # 命令模块
+│   ├── config/               # 配置管理
+│   └── tools/                # 工具层
+└── doc/
+    ├── developer/            # 开发者文档
+    └── user/                 # 用户文档
 ```
 
-### Configuration Description
+### 技术架构
 
-#### `shell-format.shellcheckPath`
+- **服务层模式** - 封装外部工具调用，提供统一的服务接口
+- **单例管理** - ServiceManager 管理服务实例，避免重复创建
+- **配置缓存** - 基于 SettingInfo 实现配置快照和自动失效
+- **性能优化** - 诊断结果缓存、并行诊断、防抖机制
 
-- **Type**: string
-- **Default**: `shellcheck`
-- **Description**: shellcheck executable path
-
-#### `shell-format.shfmtPath`
-
-- **Type**: string
-- **Default**: `shfmt`
-- **Description**: shfmt executable path
-
-#### `shell-format.tabSize`
-
-- **Type**: number | string
-- **Options**:
-  - `vscode`: Use VSCode's indent settings
-  - `ignore`: Do not validate indentation
-  - Number: Number of spaces (e.g., `2`, `4`)
-- **Default**: `vscode`
-- **Description**: Indentation settings
-
-#### `shell-format.logOutput`
-
-- **Type**: string
-- **Options**:
-  - `off`: Disable log output
-  - `on`: Enable log output
-- **Default**: `off`
-- **Description**: Whether to output logs to console and output window
-
-#### `shell-format.onError`
-
-- **Type**: string
-- **Options**:
-  - `ignore`: Ignore errors
-  - `showProblem`: Show problems
-- **Default**: `showProblem`
-- **Description**: Error handling method
-
-## Plugin Commands
-
-### Format Commands
-
-| Command | Description |
-|---------|-------------|
-| Format document with shell-format | Format entire document |
-
-### Fix Commands
-
-| Command | Description |
-|---------|-------------|
-| Fix All Problems By Shellformat | Fix all formatting issues with one click |
-
-## Usage
-
-### 1. Format Document
-
-#### Method 1: Format Entire Document
-
-- Shortcut: `Shift+Alt+F` (Windows/Linux) or `Shift+Option+F` (macOS)
-- Right-click menu: Select "Format Document"
-- Command Palette: Enter "Format Document By Shellformat"
-
-#### Method 2: Format Selected Text
-
-- Select the code to format
-- Shortcut: `Ctrl+K Ctrl+F` (Windows/Linux) or `Cmd+K Cmd+F` (macOS)
-- Right-click menu: Select "Format Selection"
-
-> Note: Shell script formatting requires full context (if/fi, do/done pairing), so even when text is selected, the entire document is formatted. VSCode automatically crops changes within the selection.
-
-### 2. Quick Fix Issues
-
-#### Fix Single Issue
-
-- Hover mouse over error code
-- Click yellow light bulb icon
-- Select "Fix this issue with shell-format"
-
-#### Fix All Issues
-
-- Click yellow light bulb icon in code editor
-- Select "Fix all problems with shell-format"
-- Or execute "Shell Format: Fix All Problems By Shellformat" in Command Palette
-
-### 3. View Errors and Warnings
-
-- Open VSCode's "Problems" panel (`Ctrl+Shift+M` / `Cmd+Shift+M`)
-- View all shell script errors and warnings
-- Error sources:
-  - `shellcheck`: Syntax and semantic errors (red)
-  - `shell-format`: Formatting issues (yellow)
-
-### 4. View Logs
-
-- Open Output panel (`Ctrl+Shift+U` / `Cmd+Shift+U`)
-- Select "shell-format" channel to view detailed logs
-- All log lines include timestamps in `[HH:MM:SS]` format
-
-## Formatting Example
-
-### Before Formatting
+### 快速上手
 
 ```bash
-#!/bin/bash
-if [ -f "test.txt" ];then
-echo "file exists"
-fi
+# 安装依赖
+npm install
+
+# 打包插件
+## 方法1
+npm run package:extension
+## 方法2
+npx vsce package
+
+# 安装插件
+##方法1
+npm run install:extension
+##方法2
+右键点击根目录下的 shell-format-0.0.1.vsix 文件，点击"安装扩展VSIX"
 ```
 
-### After Formatting
+详细说明请参考 [快速开始指南](doc/developer/getting-started.md)。
 
-```bash
-#!/bin/bash
-if [ -f "test.txt" ]; then
-    echo "file exists"
-fi
-```
+### 用户文档
 
-## Supported File Types
+面向最终用户的使用文档请查看 [doc/user/](doc/user/)：
 
-- `.sh` - Shell scripts
-- `.bash` - Bash scripts
-- `.zsh` - Zsh scripts
+- **配置选项** - 完整的配置说明
+- **使用方法** - 格式化、快速修复等操作指南
+- **常见问题** - 故障排除和 FAQ
 
-## Troubleshooting
+---
 
-### Formatting Not Working
+## 系统要求
 
-1. **Check if shfmt is installed**
+- **Node.js** >= 16.x
+- **npm** >= 8.x
+- **TypeScript** >= 5.0
+- **VSCode** >= 1.74.0
 
-   ```bash
-   shfmt --version
-   ```
-
-2. **Check shfmt path configuration**
-
-   ```json
-   {
-     "shell-format.shfmtPath": "/path/to/shfmt"
-   }
-   ```
-
-3. **View logs**
-
-   - Open Output panel (`Ctrl+Shift+U`)
-   - Select "shell-format" channel
-   - Enable logs in settings: `shell-format.logOutput: on`
-
-### Error Detection Not Working
-
-1. **Check if shellcheck is installed**
-
-   ```bash
-   shellcheck --version
-   ```
-
-2. **Check shellcheck path configuration**
-
-   ```json
-   {
-     "shell-format.shellcheckPath": "/path/to/shellcheck"
-   }
-   ```
-
-3. **Check error handling method**
-
-   ```json
-   {
-     "shell-format.onError": "showProblem"
-   }
-   ```
-
-### Plugin Not Activating
-
-1. Check if file extension is `.sh`, `.bash`, or `.zsh`
-2. Open a Shell script file
-3. Check if "Problems" panel shows errors
-
-## FAQ
-
-### Q: Why is the entire document formatted when I format selected text?
-
-A: Shell script formatting requires full context (like if/fi, do/done pairing), so even when text is selected, shfmt formats the entire document. VSCode automatically crops changes within the selection and applies them to the editor.
-
-### Q: Can shellcheck errors be automatically fixed?
-
-A: No. shellcheck detects semantic errors and best practice issues, which developers need to fix manually based on specific scenarios. Only formatting issues (detected by shfmt) can be automatically fixed.
-
-### Q: How to disable specific shellcheck warnings?
-
-A: You can use comments in your script to disable specific warnings:
-
-```bash
-#!/bin/bash
-# shellcheck disable=SC2034
-local unused_var="test"
-
-# Disable multiple warnings
-# shellcheck disable=SC2034,SC2154
-```
-
-### Q: How to view detailed logs?
-
-A:
-
-1. Enable logs in settings: `shell-format.logOutput: on`
-2. Open Output panel (`Ctrl+Shift+U` / `Cmd+Shift+U`)
-3. Select "shell-format" channel
-
-### Q: Will this plugin affect VSCode performance?
-
-A: No. The plugin uses debouncing (500ms) to avoid frequent diagnostic triggers. All external commands are executed asynchronously and won't block the UI.
-
-## System Requirements
-
-### VSCode Version
-
-- VSCode >= 1.74.0
-
-### External Tools
-
-#### shfmt (Required)
-
-Shell script formatting tool
-
-**macOS**:
-
-```bash
-brew install shfmt
-```
-
-**Linux (Ubuntu/Debian)**:
-
-```bash
-sudo apt-get install shfmt
-```
-
-**Install with Go**:
-
-```bash
-go install mvdan.cc/sh/v3/cmd/shfmt@latest
-```
-
-#### shellcheck (Recommended)
-
-Shell script static analysis tool
-
-**macOS**:
-
-```bash
-brew install shellcheck
-```
-
-**Linux (Ubuntu/Debian)**:
-
-```bash
-sudo apt-get install shellcheck
-```
-
-**Install with Go**:
-
-```bash
-go install github.com/koalaman/shellcheck/cmd/shellcheck@latest
-```
-
-> Note: shellcheck is optional. If not installed, the plugin will only use shfmt for formatting and basic checking.
-
-## Contact Developer
-
-For questions or suggestions, please contact via:
-
-- **GitHub Issues**: [Submit an Issue](https://github.com/bdq460/shell-format/issues)
-- **Email**: [Send Email](mailto:bdq460@gmail.com)
-
-## Links
+## 链接
 
 - [GitHub](https://github.com/bdq460/shell-format)
 - [Issues](https://github.com/bdq460/shell-format/issues)
 - [License](LICENSE)
 
-## Acknowledgments
+## 致谢
 
-Thanks to the following open source tools:
+感谢以下开源工具：
 
-- [shfmt](https://github.com/mvdan/sh) - Shell script formatting tool
-- [shellcheck](https://github.com/koalaman/shellcheck) - Shell script static analysis tool
+- [shfmt](https://github.com/mvdan/sh) - Shell 脚本格式化工具
+- [shellcheck](https://github.com/koalaman/shellcheck) - Shell 脚本静态分析工具
