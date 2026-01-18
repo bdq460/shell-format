@@ -5,15 +5,7 @@
 
 import * as vscode from "vscode";
 import { PackageInfo, SettingInfo } from "../config";
-import { Logger, setLogger } from "../utils/log";
-
-// 日志级别枚举
-enum LogLevel {
-    DEBUG = 0,
-    INFO = 1,
-    WARN = 2,
-    ERROR = 3,
-}
+import { Logger, LogLevel, setLogger, shouldLogByLevel } from "../utils/log";
 
 // export let logger: LoggerAdapter
 
@@ -50,42 +42,22 @@ export class LoggerAdapter implements Logger, vscode.Disposable {
     }
 
     /**
-     * 将字符串日志级别转换为 LogLevel 枚举
-     */
-    private parseLogLevel(level: string): LogLevel {
-        switch (level.toLowerCase()) {
-            case "debug":
-                return LogLevel.DEBUG;
-            case "info":
-                return LogLevel.INFO;
-            case "warn":
-                return LogLevel.WARN;
-            case "error":
-                return LogLevel.ERROR;
-            default:
-                return LogLevel.INFO;
-        }
-    }
-
-    /**
      * 检查日志级别是否应该输出
      */
-    private shouldLog(messageLevel: LogLevel): boolean {
+    private shouldLogMessage(messageLevel: LogLevel): boolean {
         const logConfig = SettingInfo.getLog();
         if (!logConfig.enabled) {
             return false;
         }
 
-        const configLevel = this.parseLogLevel(logConfig.level);
-
-        return messageLevel >= configLevel;
+        return shouldLogByLevel(messageLevel, logConfig.level);
     }
 
     /**
      * 获取日志级别的字符串表示
      */
     private getLevelString(level: LogLevel): string {
-        switch (level) {
+        switch (level.toLowerCase ? level.toLowerCase() : level) {
             case LogLevel.DEBUG:
                 return "DEBUG";
             case LogLevel.INFO:
@@ -217,7 +189,7 @@ export class LoggerAdapter implements Logger, vscode.Disposable {
 
     logMessage(message: string, level: LogLevel) {
         // 检查是否应该输出该级别的日志
-        if (!this.shouldLog(level)) {
+        if (!this.shouldLogMessage(level)) {
             return;
         }
 
