@@ -9,8 +9,9 @@
  */
 
 import * as vscode from "vscode";
+import { getContainer, ServiceNames } from "../di";
 import { PERFORMANCE_METRICS } from "../metrics";
-import { getPluginManager } from "../plugins";
+import { PluginManager } from "../plugins";
 import { logger, startTimer } from "../utils";
 
 // ==================== 格式化执行层 ====================
@@ -27,17 +28,25 @@ async function runFormat(
 ): Promise<vscode.TextEdit[]> {
     logger.info(`Start format document: ${document.fileName}`);
 
-    // 使用 PluginManager 执行格式化
-    const pluginManager = getPluginManager();
+    // 使用 DI 容器获取 PluginManager
+    const container = getContainer();
+    const pluginManager = container.resolve<PluginManager>(
+        ServiceNames.PLUGIN_MANAGER,
+    );
 
     const timer = startTimer(PERFORMANCE_METRICS.FORMAT_DURATION);
     try {
-        const edits = await pluginManager.format(document, {
-            token,
-            timeout: undefined,
-        });
+        let edits: vscode.TextEdit[] = [];
+        try {
+            edits = await pluginManager.format(document, {
+                token,
+                timeout: undefined,
+            });
+        } catch (pluginError) {
+            logger.error(`pluginManager.format failed: ${String(pluginError)}`);
+            edits = [];
+        }
         timer.stop();
-
         logger.debug(`Format returned ${edits.length} edits`);
         return edits;
     } catch (error) {

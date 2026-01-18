@@ -5,7 +5,8 @@
 
 import * as vscode from "vscode";
 import { SettingInfo } from "../config";
-import { getPluginManager } from "../plugins";
+import { getContainer, ServiceNames } from "../di";
+import { PluginManager } from "../plugins";
 import { logger } from "../utils/log";
 
 /**
@@ -26,7 +27,10 @@ export function registerPluginStatusCommand(): vscode.Disposable {
  * 显示插件状态
  */
 function showPluginStatus(): void {
-    const pluginManager = getPluginManager();
+    const container = getContainer();
+    const pluginManager = container.resolve<PluginManager>(
+        ServiceNames.PLUGIN_MANAGER,
+    );
     const stats = pluginManager.getStats();
 
     // 构建状态报告

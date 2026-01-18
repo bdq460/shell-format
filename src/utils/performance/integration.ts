@@ -6,7 +6,7 @@
  */
 
 import { logger } from "../log";
-import { PerformanceTimer, performanceMonitor } from "./performanceMonitor";
+import { PerformanceTimer, performanceMonitor } from "./monitor";
 
 /**
  * 性能监控装饰器
@@ -17,13 +17,15 @@ import { PerformanceTimer, performanceMonitor } from "./performanceMonitor";
  */
 export function measurePerformance(metricName: string): MethodDecorator {
     return function (
-        _target: any,
+        _target: object,
         propertyKey: string | symbol,
         descriptor: PropertyDescriptor,
     ): PropertyDescriptor {
-        const originalMethod = descriptor.value;
+        const originalMethod = descriptor.value as (
+            ...args: unknown[]
+        ) => Promise<unknown>;
 
-        descriptor.value = async function (...args: any[]) {
+        descriptor.value = async function (...args: unknown[]) {
             const timer = new PerformanceTimer(metricName, performanceMonitor);
             logger.debug(`Starting ${metricName} for ${String(propertyKey)}`);
 
@@ -51,9 +53,9 @@ export function measurePerformance(metricName: string): MethodDecorator {
  */
 export function wrapAsync<T>(
     metricName: string,
-    fn: (...args: any[]) => Promise<T>,
-): (...args: any[]) => Promise<T> {
-    return async function (this: any, ...args: any[]): Promise<T> {
+    fn: (...args: unknown[]) => Promise<T>,
+): (...args: unknown[]) => Promise<T> {
+    return async function (this: unknown, ...args: unknown[]): Promise<T> {
         const timer = new PerformanceTimer(metricName, performanceMonitor);
         logger.debug(`Starting ${metricName}`);
 
@@ -82,9 +84,9 @@ export function wrapAsync<T>(
  */
 export function wrapSync<T>(
     metricName: string,
-    fn: (...args: any[]) => T,
-): (...args: any[]) => T {
-    return function (this: any, ...args: any[]): T {
+    fn: (...args: unknown[]) => T,
+): (...args: unknown[]) => T {
+    return function (this: unknown, ...args: unknown[]): T {
         const timer = new PerformanceTimer(metricName, performanceMonitor);
         logger.debug(`Starting ${metricName}`);
 
@@ -233,5 +235,7 @@ export function disablePerformanceMonitoring(): void {
  * @returns 是否启用
  */
 export function isPerformanceMonitoringEnabled(): boolean {
-    return (performanceMonitor as any).isEnabled;
+    // performanceMonitor 具有 isEnabled 属性，通过接口定义而不是类型转换
+    const monitor = performanceMonitor as unknown as { isEnabled: boolean };
+    return monitor.isEnabled ?? false;
 }

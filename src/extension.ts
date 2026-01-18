@@ -11,11 +11,12 @@ import {
 } from "./adapters/loggerAdapter";
 import { registerAllCommands } from "./commands";
 import { PackageInfo, SettingInfo } from "./config";
+import { getContainer, initializeDIContainer } from "./di";
 import { diagnoseAllShellScripts, diagnoseDocument } from "./diagnostics";
 import { formatDocument } from "./formatters";
-import { activatePlugins, initializePlugins } from "./plugins";
+import { initializePlugins } from "./plugins";
 import { ShellFormatCodeActionProvider } from "./providers";
-import { logger } from "./utils/log";
+import { DebounceManager, logger } from "./utils";
 
 /**
  * 检查是否应该跳过该文件
@@ -41,8 +42,9 @@ function shouldSkipFile(fileName: string): boolean {
     return skipPatterns.some((pattern) => pattern.test(baseName));
 }
 
-// 防抖定时器 Map (key: document URI string, value: timer)
-const debounceTimers = new Map<string, NodeJS.Timeout>();
+// ==================== 防抖管理类 ====================
+
+const debounceManager = new DebounceManager();
 
 /**
  * 扩展激活函数
@@ -54,77 +56,22 @@ export function activate(context: vscode.ExtensionContext) {
 
     logger.info("Extension is now active");
 
-    // 初始化纯插件系统
-    logger.info("Initializing pure plugin system");
+    // 初始化 DI 容器并注册所有服务
+    logger.info("Initializing DI container");
+    const container = getContainer();
+    initializeDIContainer(container);
+
+    // 初始化插件
+    logger.info("Initializing plugins from DI container");
     initializePlugins();
 
-    // 激活所有可用插件
-    activatePlugins()
-        .then(() => {
-            logger.info("Plugin system activated successfully");
-        })
-        .catch((error) => {
-            logger.error(`Failed to activate plugins: ${String(error)}`);
-        });
-
     // 创建诊断集合
-    //
-    // 什么是 DiagnosticCollection？
-    // DiagnosticCollection 是 VSCode 提供的用于管理诊断信息（错误、警告、提示）的 API。
-    //
-    // DiagnosticCollection 的作用
-    //  - 显示诊断信息：在编辑器中显示错误、警告、提示
-    //  - 统一管理：集中管理所有文档的诊断信息
-    //  - 问题面板：在"问题"面板中显示所有诊断
-    //  - 代码提示：在代码中显示波浪线和灯泡图标
-
-    // DiagnosticCollection在插件退出时要被清理
-    // DiagnosticCollection 实现了 Disposable 接口，需要调用 dispose() 来释放资源：
-    //  - 内存占用：保存大量诊断信息占用内存
-    //  - UI 资源：编辑器中的波浪线、灯泡图标等 UI 元素
-    //  - 事件监听：内部可能有事件监听器
     logger.info("Diagnostic collection created");
     const diagnosticCollection = vscode.languages.createDiagnosticCollection(
         PackageInfo.extensionName,
     );
 
     // 注册文档格式化提供者
-    // 通过快捷键,或命令面板中或选中代码后的右键菜单中调用Format Document 命令时调用会触发注册的函数
-    //
-    // DocumentFormattingEditProvider 接口用于提供文档格式化功能
-    //
-    // 触发条件：
-    //  快捷键: 用户按下格式化文档快捷键（默认是 Cmd + Shift + F / Ctrl + Shift + F）
-    //  命令面板: 用户从命令面板选择"格式化文档"
-    //  保存时: 如果配置了 editor.formatOnSave
-    //  粘贴时: 如果配置了 editor.formatOnPaste
-    //  输入时: 如果配置了 editor.formatOnType
-    //  自动保存: 文件自动保存时触发
-    //
-    // 格式化结果应用:
-    // provideDocumentFormattingEdits() 方法返回一个 TextEdit[]，表示格式化后的文本
-    // vscode会自动应用这些编辑更新原始文档
-    //
-    // 注意:
-    //  Note: A document range provider is also a document formatter which means there is no need to register a document formatter when also registering a range provider.
-    //  注意：文档范围提供者也同时是文档格式化提供者，因此当注册范围提供者时不需要单独注册格式化提供者。
-
-    //  因此如果调用registerDocumentRangeFormattingEditProvider注册了范围提供者:
-    //  1. 不需要再registerDocumentFormattingEditProvider
-    //  2. 不需要再注册shell-format.formatDocument命令, 因为默认格式化命令已经可以满足格式化需求
-
-    // 注册文档范围格式化提供者（用于格式化选中文本）
-    // 通过选中代码后, 从命令面板或右键菜单选择"格式化选中文本(Format Selection)"时调用会触发注册的函数
-    //
-    // DocumentRangeFormattingEditProvider 接口用于提供文档范围格式化功能
-    // 当用户从命令面板或右键菜单选择"格式化选中文本(Format Selection)"时
-    // VSCode 会调用 provideDocumentRangeFormattingEdits() 方法
-    // provideDocumentRangeFormattingEdits() 方法返回一个 TextEdit[]，表示格式化后的文本
-    // vscode会自动应用这些编辑更新原始文档
-    //
-    // 注意：Shell 脚本的格式化需要完整的上下文（if/fi、do/done 等配对），
-    // 因此即使只选中部分文本，也需要对整个文档进行格式化。
-    // VSCode 会自动裁剪 TextEdit，只应用选区内的变更。
     logger.info("Registering document range formatting provider");
     const rangeFormatProvider =
         vscode.languages.registerDocumentRangeFormattingEditProvider(
@@ -198,17 +145,16 @@ export function activate(context: vscode.ExtensionContext) {
 
             // 清除该文档的防抖定时器，避免被后续的防抖诊断覆盖
             const uri = document.uri.toString();
-            const existingTimer = debounceTimers.get(uri);
-            if (existingTimer) {
-                clearTimeout(existingTimer);
-                debounceTimers.delete(uri);
-                logger.info(
-                    `Cleared debounce timer for saved document: ${document.fileName}`,
+            debounceManager.cancel(uri);
+
+            try {
+                const diagnostics = await diagnoseDocument(document);
+                diagnosticCollection.set(document.uri, diagnostics);
+            } catch (error) {
+                logger.error(
+                    `Error diagnosing saved document ${document.fileName}: ${String(error)}`,
                 );
             }
-
-            const diagnostics = await diagnoseDocument(document);
-            diagnosticCollection.set(document.uri, diagnostics);
         },
     );
 
@@ -227,32 +173,54 @@ export function activate(context: vscode.ExtensionContext) {
                 );
                 return;
             }
-            const diagnostics = await diagnoseDocument(document);
-            diagnosticCollection.set(document.uri, diagnostics);
+            try {
+                const diagnostics = await diagnoseDocument(document);
+                diagnosticCollection.set(document.uri, diagnostics);
+            } catch (error) {
+                logger.error(
+                    `Error diagnosing opened document ${document.fileName}: ${String(error)}`,
+                );
+            }
         },
     );
 
     // 监听文档内容变化时进行诊断（防抖）
     logger.info("Registering document change listener");
-    const changeListener = vscode.workspace.onDidChangeTextDocument(
-        async (event) => {
-            // 只处理 shell 语言文件
-            if (event.document.languageId !== PackageInfo.languageId) {
-                return;
-            }
-            // 跳过特殊文件
-            if (shouldSkipFile(event.document.fileName)) {
-                logger.info(
-                    `Skipping change diagnosis for: ${event.document.fileName} (special file)`,
-                );
-                return;
-            }
+    const changeListener = vscode.workspace.onDidChangeTextDocument((event) => {
+        // 只处理 shell 语言文件
+        if (event.document.languageId !== PackageInfo.languageId) {
+            return;
+        }
+        // 跳过特殊文件
+        if (shouldSkipFile(event.document.fileName)) {
             logger.info(
-                `Document change happened, trigger debounceDiagnose for: ${event.document.fileName}`,
+                `Skipping change diagnosis for: ${event.document.fileName} (special file)`,
             );
-            debounceDiagnose(event.document, diagnosticCollection);
-        },
-    );
+            return;
+        }
+        logger.debug(
+            `Document change triggered debounce for: ${event.document.fileName}`,
+        );
+        const uri = event.document.uri.toString();
+        debounceManager.debounce(
+            uri,
+            async () => {
+                try {
+                    const diagnostics = await diagnoseDocument(
+                        event.document,
+                        undefined,
+                        true,
+                    );
+                    diagnosticCollection.set(event.document.uri, diagnostics);
+                } catch (error) {
+                    logger.error(
+                        `Error diagnosing changed document ${event.document.fileName}: ${String(error)}`,
+                    );
+                }
+            },
+            300,
+        );
+    });
 
     // 监听配置变化
     // 监听配置变化时重新诊断所有 shell 脚本
@@ -264,39 +232,46 @@ export function activate(context: vscode.ExtensionContext) {
 
             // 检查扩展相关配置是否变化
             if (SettingInfo.isConfigurationChanged(event)) {
-                logger.info("Extension relevant configuration changed");
+                try {
+                    logger.info("Extension relevant configuration changed");
 
-                // 步骤 1: 刷新 SettingInfo 的配置缓存
-                // 这是核心：所有配置缓存在 SettingInfo 中统一管理
-                SettingInfo.refreshCache();
+                    // 步骤 1: 刷新 SettingInfo 的配置缓存
+                    // 这是核心：所有配置缓存在 SettingInfo 中统一管理
+                    SettingInfo.refreshCache();
 
-                // 步骤 2: 重新初始化插件系统（配置变化可能影响插件参数）
-                logger.info("Reinitializing plugins due to configuration change");
-                initializePlugins();
+                    // 步骤 2: 重新初始化 DI 容器和插件系统（配置变化可能影响插件参数）
+                    logger.info("Reinitializing plugins due to configuration change");
+                    const container = getContainer();
+                    container.reset(); // 清除所有单例实例
+                    initializeDIContainer(container); // 重新注册所有服务
+                    initializePlugins(); // 重新初始化插件
 
-                // 步骤 4: 激活插件（根据新配置）
-                activatePlugins()
-                    .then(() => {
-                        logger.info("Plugins reactivated successfully");
-                    })
-                    .catch((error) => {
-                        logger.error(`Failed to reactivate plugins: ${String(error)}`);
-                    });
+                    // 步骤 3: 清除所有活跃的防抖定时器
+                    debounceManager.clearAll();
 
-                // 步骤 5: 检查是否需要重新诊断
-                if (SettingInfo.isDiagnosticConfigChanged(event)) {
-                    logger.info(
-                        "Diagnostic relevant configuration changed, re-diagnosing all documents",
-                    );
+                    // 步骤 4: 检查是否需要重新诊断
+                    if (SettingInfo.isDiagnosticConfigChanged(event)) {
+                        logger.info(
+                            "Diagnostic relevant configuration changed, re-diagnosing all documents",
+                        );
 
-                    // 重新诊断所有文档
-                    const results = await diagnoseAllShellScripts();
-                    results.forEach((diagnostics, uri) => {
-                        diagnosticCollection.set(uri, diagnostics);
-                    });
+                        try {
+                            // 重新诊断所有文档
+                            const results = await diagnoseAllShellScripts();
+                            results.forEach((diagnostics, uri) => {
+                                diagnosticCollection.set(uri, diagnostics);
+                            });
+                        } catch (error) {
+                            logger.error(
+                                `Error re-diagnosing all documents: ${String(error)}`,
+                            );
+                        }
+                    }
+
+                    logger.info("Configuration change handled successfully");
+                } catch (error) {
+                    logger.error(`Error handling configuration change: ${String(error)}`);
                 }
-
-                logger.info("Configuration change handled successfully");
             }
         },
     );
@@ -305,16 +280,27 @@ export function activate(context: vscode.ExtensionContext) {
     // 这是为了确保用户在安装插件后, 能够立即看到所有 shell 脚本的诊断结果
     // 注意：不等待结果，避免阻塞 activate 函数
     logger.info("Starting background diagnosis for all open shell scripts");
-    diagnoseAllShellScripts()
-        .then((results) => {
+    (async () => {
+        try {
+            const results = await diagnoseAllShellScripts();
             results.forEach((diagnostics, uri) => {
                 diagnosticCollection.set(uri, diagnostics);
             });
-            logger.info("Background diagnosis completed");
-        })
-        .catch((error) => {
+            logger.info("Background diagnosis completed successfully");
+        } catch (error) {
             logger.error(`Background diagnosis failed: ${String(error)}`);
-        });
+        }
+    })();
+
+    // 监听文档关闭事件，清除相关的防抖定时器
+    logger.info("Registering document close listener");
+    const closeListener = vscode.workspace.onDidCloseTextDocument((document) => {
+        const uri = document.uri.toString();
+        debounceManager.cancel(uri);
+        logger.debug(
+            `Debounce timer cleared for closed document: ${document.fileName}`,
+        );
+    });
 
     // 退出时清理
     // 自动清理机制
@@ -335,51 +321,10 @@ export function activate(context: vscode.ExtensionContext) {
         saveListener,
         openListener,
         changeListener,
+        closeListener,
         configChangeListener,
         diagnosticCollection,
     );
-}
-
-/**
- *
- * 防抖（Debounce）诊断
- * 用于延迟执行文档诊断，避免在用户快速输入时频繁触发诊断操作
- * 在事件被连续触发时，只在最后一次触发后的指定时间间隔结束后才执行回调函数。
- * 用户输入:  A    B  C   D
- *   时间轴: |----|--|---|---------> 500ms
- *   诊断触发:                       ✓ (只在D之后500ms触发一次)
- *
- * @param document 文档对象
- * @param diagnosticCollection VSCode 诊断集合
- * @param delay 延迟时间（毫秒）
- */
-function debounceDiagnose(
-    document: vscode.TextDocument,
-    diagnosticCollection: vscode.DiagnosticCollection,
-    delay: number = 300,
-): void {
-    const uri = document.uri.toString();
-    logger.info(`Debouncing diagnose for: ${document.fileName}`);
-
-    // 清除该文档之前的定时器
-    const existingTimer = debounceTimers.get(uri);
-    if (existingTimer) {
-        clearTimeout(existingTimer);
-    }
-
-    // 设置新的定时器
-    const timer = setTimeout(async () => {
-        const diagnostics = await diagnoseDocument(
-            document,
-            undefined,
-            true, // 使用content模式进行诊断
-        );
-        diagnosticCollection.set(document.uri, diagnostics);
-        // 清除定时器引用
-        debounceTimers.delete(uri);
-    }, delay);
-
-    debounceTimers.set(uri, timer);
 }
 
 /**
@@ -387,22 +332,35 @@ function debounceDiagnose(
  *
  * 清理说明：
  * - context.subscriptions 中的资源由 VSCode 自动清理
- * - debounceTimers 需要手动清理
+ * - debounceManager 中的定时器需要手动清理
  * - logger 需要手动清理
+ * - DI 容器需要显式清理（如果实现了清理钩子）
  */
 export function deactivate() {
     logger.info("Extension is now deactivated");
 
-    // 清理所有防抖定时器
-    for (const [uri, timer] of debounceTimers) {
-        clearTimeout(timer);
-        logger.info(`Debounce timer cleared for: ${uri}`);
-    }
-    debounceTimers.clear();
+    try {
+        // 清理所有防抖定时器
+        const activeCount = debounceManager.getActiveCount();
+        if (activeCount > 0) {
+            logger.info(`Clearing ${activeCount} active debounce timers`);
+        }
+        debounceManager.clearAll();
 
-    // 清理日志输出通道
-    // logger转换为LoggerAdapter
-    if (logger instanceof LoggerAdapter) {
-        logger.dispose();
+        // 清理 DI 容器（执行清理钩子）
+        logger.info("Cleaning up DI container");
+        const container = getContainer();
+        if (container instanceof Object && "cleanup" in container) {
+            (container as any).cleanup();
+        }
+
+        // 清理日志输出通道
+        if (logger instanceof LoggerAdapter) {
+            logger.dispose();
+        }
+
+        logger.info("Deactivation completed successfully");
+    } catch (error) {
+        console.error(`Error during deactivation: ${String(error)}`);
     }
 }

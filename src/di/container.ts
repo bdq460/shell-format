@@ -1,4 +1,19 @@
 /**
+ * 清理钩子接口
+ * 服务如果实现此接口，将在容器清理时被调用
+ */
+export interface ICleanup {
+    cleanup(): void | Promise<void>;
+}
+
+/**
+ * 判断对象是否实现了 ICleanup 接口
+ */
+function hasCleanup(obj: any): obj is ICleanup {
+    return obj && typeof obj.cleanup === "function";
+}
+
+/**
  * 依赖注入容器
  *
  * 轻量级依赖注入实现，用于管理服务实例和依赖关系
@@ -7,9 +22,19 @@
  * - 延迟初始化：只在需要时创建实例
  * - 循环依赖检测：避免无限递归
  * - 自动依赖注入：通过构造函数注入
+ * - 服务清理钩子：支持服务自定义清理逻辑
  */
 
 import { logger } from "../utils/log";
+
+/**
+ * 清理钩子接口
+ * 服务如果实现此接口，将在容器清理时被调用
+ */
+
+/**
+ * 判断对象是否实现了 ICleanup 接口
+ */
 
 /**
  * 服务工厂函数类型
@@ -34,7 +59,13 @@ interface ServiceMetadata<T> {
  * 依赖注入容器
  */
 export class DIContainer {
-    private services = new Map<string, ServiceMetadata<any>>();
+    /**
+     * 清理所有已创建的服务
+     * 调用所有实现了 ICleanup 接口的服务的 cleanup() 方法
+     * @returns Promise，在所有清理操作完成后 resolve
+     */
+
+    private services = new Map<string, ServiceMetadata<unknown>>();
     private creatingStack = new Set<string>();
 
     /**
@@ -49,11 +80,13 @@ export class DIContainer {
         dependencies: string[] = [],
     ): void {
         if (this.services.has(name)) {
-            logger.warn(`Service "${name}" is already registered, will be overwritten`);
+            logger.warn(
+                `Service "${name}" is already registered, will be overwritten`,
+            );
         }
 
         this.services.set(name, {
-            factory,
+            factory: factory as ServiceFactory<unknown>,
             instantiated: false,
             dependencies,
         });
@@ -73,11 +106,13 @@ export class DIContainer {
         dependencies: string[] = [],
     ): void {
         if (this.services.has(name)) {
-            logger.warn(`Service "${name}" is already registered, will be overwritten`);
+            logger.warn(
+                `Service "${name}" is already registered, will be overwritten`,
+            );
         }
 
         this.services.set(name, {
-            factory,
+            factory: factory as ServiceFactory<unknown>,
             instantiated: false, // 总是 false，因为每次都创建新实例
             dependencies,
         });
@@ -105,7 +140,7 @@ export class DIContainer {
         }
 
         // 如果是单例且已实例化，直接返回
-        if (service.instantiated && service.instance) {
+        if (service.instantiated && service.instance !== undefined) {
             logger.debug(`Resolving existing singleton: ${name}`);
             return service.instance as T;
         }
@@ -114,7 +149,7 @@ export class DIContainer {
         this.creatingStack.add(name);
         try {
             logger.debug(`Creating new instance: ${name}`);
-            const instance = service.factory();
+            const instance = service.factory() as T;
 
             // 如果是单例，缓存实例
             if (service.instantiated === false) {
@@ -153,6 +188,53 @@ export class DIContainer {
     }
 
     /**
+     * 清理所有已创建的服务
+     * 调用所有实现了 ICleanup 接口的服务的 cleanup() 方法
+     * @returns Promise，在所有清理操作完成后 resolve
+     */
+    async cleanup(): Promise<void> {
+        logger.info("Cleaning up DI container services");
+        const cleanupPromises: Promise<void>[] = [];
+
+        for (const [name, metadata] of this.services.entries()) {
+            // 只清理已实例化的服务
+            if (metadata.instantiated && metadata.instance) {
+                if (hasCleanup(metadata.instance)) {
+                    try {
+                        const result = metadata.instance.cleanup();
+                        // 处理异步清理
+                        if (
+                            result &&
+                            typeof (result as Promise<void>).then === "function"
+                        ) {
+                            cleanupPromises.push(result as Promise<void>);
+                        }
+                        logger.debug(`Cleaned up service: ${name}`);
+                    } catch (error) {
+                        logger.error(
+                            `Error cleaning up service "${name}": ${String(error)}`,
+                        );
+                    }
+                }
+            }
+        }
+
+        // 等待所有异步清理操作完成
+        if (cleanupPromises.length > 0) {
+            try {
+                await Promise.all(cleanupPromises);
+                logger.info(
+                    `${cleanupPromises.length} async cleanup operations completed`,
+                );
+            } catch (error) {
+                logger.error(`Error during async cleanup: ${String(error)}`);
+            }
+        }
+
+        logger.info("DI container cleanup completed");
+    }
+
+    /**
      * 清除所有服务注册和实例（主要用于测试）
      */
     clear(): void {
@@ -182,11 +264,13 @@ export class DIContainer {
             dependencies: string[];
         }>;
     } {
-        const services = Array.from(this.services.entries()).map(([name, metadata]) => ({
-            name,
-            instantiated: metadata.instantiated,
-            dependencies: metadata.dependencies,
-        }));
+        const services = Array.from(this.services.entries()).map(
+            ([name, metadata]) => ({
+                name,
+                instantiated: metadata.instantiated,
+                dependencies: metadata.dependencies,
+            }),
+        );
 
         return {
             total: services.length,

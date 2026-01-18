@@ -5,8 +5,9 @@
 
 import * as vscode from "vscode";
 import { PackageInfo } from "../config";
+import { getContainer, ServiceNames } from "../di";
 import { logger } from "../utils/log";
-import { performanceMonitor } from "../utils/performance/performanceMonitor";
+import { PerformanceMonitor } from "../utils/performance/monitor";
 
 /**
  * 注册性能报告命令
@@ -26,7 +27,11 @@ export function registerPerformanceReportCommand(): vscode.Disposable {
  * 显示性能报告
  */
 function showPerformanceReport(): void {
-    const report = performanceMonitor.generateReport();
+    const container = getContainer();
+    const monitor = container.resolve<PerformanceMonitor>(
+        ServiceNames.PERFORMANCE_MONITOR,
+    );
+    const report = monitor.generateReport();
 
     // 创建输出通道显示性能报告
     const outputChannel = vscode.window.createOutputChannel(
@@ -55,7 +60,11 @@ export function registerResetPerformanceCommand(): vscode.Disposable {
             );
 
             if (confirm === "Reset") {
-                performanceMonitor.reset();
+                const container = getContainer();
+                const monitor = container.resolve<PerformanceMonitor>(
+                    ServiceNames.PERFORMANCE_MONITOR,
+                );
+                monitor.reset();
                 vscode.window.showInformationMessage(
                     "Performance metrics have been reset.",
                 );

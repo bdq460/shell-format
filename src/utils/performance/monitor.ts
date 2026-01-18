@@ -241,14 +241,16 @@ export function startTimer(name: string): PerformanceTimer {
  */
 export function performance(metricName: string): MethodDecorator {
     return function (
-        _target: any,
+        _target: object,
         _propertyKey: string | symbol,
-        descriptor: PropertyDescriptor
+        descriptor: PropertyDescriptor,
     ): PropertyDescriptor {
-        const originalMethod = descriptor.value;
+        const originalMethod = descriptor.value as (
+            ...args: unknown[]
+        ) => Promise<unknown>;
         const monitor = PerformanceMonitor.getInstance();
 
-        descriptor.value = async function (...args: any[]) {
+        descriptor.value = async function (...args: unknown[]) {
             const timer = new PerformanceTimer(metricName, monitor);
             try {
                 return await originalMethod.apply(this, args);

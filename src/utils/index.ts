@@ -2,6 +2,7 @@
  * 工具类模块
  */
 
+export * from "./debounce";
 export { logger } from "./log";
-export * from "./performance/performanceIntegration";
-export * from "./performance/performanceMonitor";
+export * from "./performance/integration";
+export * from "./performance/monitor";

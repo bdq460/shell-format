@@ -10,8 +10,9 @@
 
 import * as vscode from "vscode";
 import { PackageInfo, SettingInfo } from "../config";
+import { getContainer, ServiceNames } from "../di";
 import { PERFORMANCE_METRICS } from "../metrics";
-import { getPluginManager } from "../plugins";
+import { PluginManager } from "../plugins";
 import { logger, startTimer } from "../utils";
 
 // ==================== 诊断执行层 ====================
@@ -39,13 +40,20 @@ async function runDiagnose(
 
     const timer = startTimer(PERFORMANCE_METRICS.DIAGNOSE_ONE_DOC_DURATION);
     try {
-        const pluginManager = getPluginManager();
-
-        const result = await pluginManager.check(document, {
-            token,
-            timeout: undefined,
-        });
-
+        const container = getContainer();
+        const pluginManager = container.resolve<PluginManager>(
+            ServiceNames.PLUGIN_MANAGER,
+        );
+        let result;
+        try {
+            result = await pluginManager.check(document, {
+                token,
+                timeout: undefined,
+            });
+        } catch (pluginError) {
+            logger.error(`pluginManager.check failed: ${String(pluginError)}`);
+            result = { diagnostics: [], hasErrors: true };
+        }
         timer.stop();
         logger.debug(`Diagnose returned ${result.diagnostics.length} diagnostics`);
         return result.diagnostics;

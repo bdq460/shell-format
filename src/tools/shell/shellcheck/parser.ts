@@ -40,10 +40,20 @@ function parseIssues(output: string): LinterIssue[] {
         );
 
         if (match) {
+            const typeStr = match[3];
+            const validTypes: Array<"error" | "warning" | "info"> = [
+                "error",
+                "warning",
+                "info",
+            ];
+            const type = validTypes.includes(typeStr as any)
+                ? (typeStr as "error" | "warning" | "info")
+                : "warning";
+
             issues.push({
                 line: parseInt(match[1], 10) - 1,
                 column: parseInt(match[2], 10) - 1,
-                type: match[3] as any,
+                type,
                 message: match[4],
                 code: match[5],
             });

@@ -100,104 +100,35 @@ export class PluginManager {
 
         const plugins = Array.from(this.plugins.values());
         const availablePlugins: IFormatPlugin[] = [];
+        const errors: string[] = [];
 
-        for (const plugin of plugins) {
-            try {
-                logger.debug(`Checking plugin: ${plugin.name}`);
-                const isAvailable = await plugin.isAvailable();
-                if (isAvailable) {
-                    availablePlugins.push(plugin);
-                    logger.debug(`Plugin "${plugin.name}" is available`);
-                } else {
-                    logger.warn(`Plugin "${plugin.name}" is not available`);
+        await Promise.all(
+            plugins.map(async (plugin) => {
+                try {
+                    logger.debug(`Checking plugin: ${plugin.name}`);
+                    const isAvailable = await plugin.isAvailable();
+                    if (isAvailable) {
+                        availablePlugins.push(plugin);
+                        logger.debug(`Plugin "${plugin.name}" is available`);
+                    } else {
+                        logger.warn(`Plugin "${plugin.name}" is not available`);
+                    }
+                } catch (error) {
+                    const msg = `Error checking availability of plugin "${plugin.name}": ${String(error)}`;
+                    logger.error(msg);
+                    errors.push(msg);
                 }
-            } catch (error) {
-                logger.error(
-                    `Error checking availability of plugin "${plugin.name}": ${String(error)}`,
-                );
-            }
-        }
+            }),
+        );
 
         timer.stop();
         logger.info(
             `Available plugins: ${availablePlugins.length}/${plugins.length}`,
         );
-
+        if (errors.length > 0) {
+            logger.warn(`Plugin availability errors: \n${errors.join("\n")}`);
+        }
         return availablePlugins;
-    }
-
-    /**
-     * 激活插件
-     * @param name 插件名称
-     * @returns 是否激活成功
-     */
-    async activate(name: string): Promise<boolean> {
-        const plugin = this.plugins.get(name);
-
-        if (!plugin) {
-            logger.error(`Plugin "${name}" is not registered`);
-            return false;
-        }
-
-        const isAvailable = await plugin.isAvailable();
-
-        if (!isAvailable) {
-            logger.warn(`Plugin "${name}" is not available`);
-            return false;
-        }
-
-        this.activePlugins.add(name);
-        logger.info(`Activated plugin: ${name}`);
-        return true;
-    }
-
-    /**
-     * 停用插件
-     * @param name 插件名称
-     */
-    deactivate(name: string): void {
-        if (!this.plugins.has(name)) {
-            logger.warn(`Plugin "${name}" is not registered`);
-            return;
-        }
-
-        this.activePlugins.delete(name);
-        logger.info(`Deactivated plugin: ${name}`);
-    }
-
-    /**
-     * 批量激活插件
-     * @param names 插件名称数组
-     * @returns 成功激活的插件数量
-     */
-    async activateMultiple(names: string[]): Promise<number> {
-        const timer = startTimer(PERFORMANCE_METRICS.PLUGIN_LOAD_DURATION);
-        logger.info(`Activating ${names.length} plugins`);
-
-        let successCount = 0;
-        const failedPlugins: string[] = [];
-
-        for (const name of names) {
-            const success = await this.activate(name);
-            if (success) {
-                successCount++;
-            } else {
-                failedPlugins.push(name);
-            }
-        }
-
-        timer.stop();
-        if (failedPlugins.length > 0) {
-            logger.warn(
-                `Plugin activation completed: ${successCount}/${names.length} successful (failed: ${failedPlugins.join(", ")})`,
-            );
-        } else {
-            logger.info(
-                `Plugin activation completed: ${successCount}/${names.length} successful`,
-            );
-        }
-
-        return successCount;
     }
 
     /**
@@ -221,6 +152,7 @@ export class PluginManager {
             return [];
         }
 
+        const errors: string[] = [];
         for (const name of this.activePlugins) {
             const plugin = this.plugins.get(name);
 
@@ -241,15 +173,17 @@ export class PluginManager {
                         );
                     }
                 } catch (error) {
-                    logger.error(
-                        `Plugin "${name}" format failed: ${String(error)}, trying next plugin`,
-                    );
-                    // 继续尝试下一个插件
+                    const msg = `Plugin "${name}" format failed: ${String(error)}, trying next plugin`;
+                    logger.error(msg);
+                    errors.push(msg);
                 }
             }
         }
 
         timer.stop();
+        if (errors.length > 0) {
+            logger.warn(`Format errors: \n${errors.join("\n")}`);
+        }
         logger.warn(
             `No active plugin successfully formatted the document: ${document.fileName}`,
         );
@@ -282,6 +216,7 @@ export class PluginManager {
 
         const allDiagnostics: vscode.Diagnostic[] = [];
         let hasErrors = false;
+        const errors: string[] = [];
 
         for (const name of this.activePlugins) {
             const plugin = this.plugins.get(name);
@@ -308,13 +243,18 @@ export class PluginManager {
                         );
                     }
                 } catch (error) {
-                    logger.error(`Plugin "${name}" check failed: ${String(error)}`);
+                    const msg = `Plugin "${name}" check failed: ${String(error)}`;
+                    logger.error(msg);
+                    errors.push(msg);
                     hasErrors = true;
                 }
             }
         }
 
         timer.stop();
+        if (errors.length > 0) {
+            logger.warn(`Check errors: \n${errors.join("\n")}`);
+        }
         logger.info(
             `Checking completed: ${allDiagnostics.length} total diagnostics from ${this.activePlugins.size} plugins`,
         );
@@ -352,6 +292,62 @@ export class PluginManager {
         logger.info("Reactivating plugins: deactivate all then activate selected");
         this.deactivateAll();
         return this.activateMultiple(names);
+    }
+
+    /**
+     * 批量激活插件（并行执行以提升性能）
+     * @param names 插件名称数组
+     * @returns 成功激活的插件数量
+     */
+    async activateMultiple(names: string[]): Promise<number> {
+        const timer = startTimer(PERFORMANCE_METRICS.PLUGIN_LOAD_DURATION);
+        logger.info(`Activating ${names.length} plugins`);
+
+        const activationResults = await Promise.all(
+            names.map(async (name) => {
+                const success = await this.activate(name);
+                return { name, success };
+            }),
+        );
+
+        const successCount = activationResults.filter((r) => r.success).length;
+        const failedPlugins = activationResults
+            .filter((r) => !r.success)
+            .map((r) => r.name);
+
+        timer.stop();
+        if (failedPlugins.length > 0) {
+            logger.warn(
+                `Plugin activation completed: ${successCount}/${names.length} successful (failed: ${failedPlugins.join(", ")})`,
+            );
+        } else {
+            logger.info(
+                `Plugin activation completed: ${successCount}/${names.length} successful`,
+            );
+        }
+
+        return successCount;
+    }
+
+    /**
+     * 激活插件
+     * @param name 插件名称
+     * @returns 是否激活成功
+     */
+    async activate(name: string): Promise<boolean> {
+        const plugin = this.plugins.get(name);
+        if (!plugin) {
+            logger.error(`Plugin "${name}" is not registered`);
+            return false;
+        }
+        const isAvailable = await plugin.isAvailable();
+        if (!isAvailable) {
+            logger.warn(`Plugin "${name}" is not available`);
+            return false;
+        }
+        this.activePlugins.add(name);
+        logger.info(`Activated plugin: ${name}`);
+        return true;
     }
 
     /**
