@@ -13,8 +13,8 @@ import { registerAllCommands } from "./commands";
 import { PackageInfo, SettingInfo } from "./config";
 import { diagnoseAllShellScripts, diagnoseDocument } from "./diagnostics";
 import { formatDocument } from "./formatters";
+import { activatePlugins, initializePlugins } from "./plugins";
 import { ShellFormatCodeActionProvider } from "./providers";
-import { ServiceManager } from "./services/serviceManager";
 import { logger } from "./utils/log";
 
 /**
@@ -53,6 +53,19 @@ export function activate(context: vscode.ExtensionContext) {
     initializeLoggerAdapter();
 
     logger.info("Extension is now active");
+
+    // 初始化纯插件系统
+    logger.info("Initializing pure plugin system");
+    initializePlugins();
+
+    // 激活所有可用插件
+    activatePlugins()
+        .then(() => {
+            logger.info("Plugin system activated successfully");
+        })
+        .catch((error) => {
+            logger.error(`Failed to activate plugins: ${String(error)}`);
+        });
 
     // 创建诊断集合
     //
@@ -99,25 +112,6 @@ export function activate(context: vscode.ExtensionContext) {
     //  因此如果调用registerDocumentRangeFormattingEditProvider注册了范围提供者:
     //  1. 不需要再registerDocumentFormattingEditProvider
     //  2. 不需要再注册shell-format.formatDocument命令, 因为默认格式化命令已经可以满足格式化需求
-    // logger.info('Registering document formatting provider');
-    // const formatProvider = vscode.languages.registerDocumentFormattingEditProvider(
-    //     PackageInfo.languageId,
-    //     {
-    //         provideDocumentFormattingEdits(
-    //             document: vscode.TextDocument,
-    //             options: vscode.FormattingOptions,
-    //             token: vscode.CancellationToken
-    //         ): vscode.ProviderResult<vscode.TextEdit[]> {
-    //             logger.info(`Document formatting triggered! Document: ${document.fileName}`);
-    //             // 跳过特殊文件
-    //             if (shouldSkipFile(document.fileName)) {
-    //                 logger.info(`Skipping formatting for: ${document.fileName} (special file)`);
-    //                 return [];
-    //             }
-    //             return formatDocument(document, options, token);
-    //         }
-    //     }
-    // );
 
     // 注册文档范围格式化提供者（用于格式化选中文本）
     // 通过选中代码后, 从命令面板或右键菜单选择"格式化选中文本(Format Selection)"时调用会触发注册的函数
@@ -159,78 +153,15 @@ export function activate(context: vscode.ExtensionContext) {
                     logger.info(
                         `Note: Shell script formatting requires full document context, will format entire document`,
                     );
-                    return formatDocument(document, options, token);
+                    return formatDocument(document, options, token, true);
                 },
             },
         );
 
     // 注册 Code Actions 类型提供者
-    // 1. PackageInfo.languageId,: 绑定特定语言
-    // 2. CodeActionProvider的作用: 绑定Code Actions与具体执行命令名称(注意不是实现,只绑定是命令名称)
-    // 3. providedCodeActionKinds: 声明支持的 Code Actions 类型, 用于过滤哪些 Code Actions 类型需要调用你的 provider
-    //    - QuickFix 类型：修复单个问题
-    //    - SourceFixAll 类型：修复所有问题
-    //
-    // CodeActionProvider的作用
-    // 当触发特定动作时, VSCode会调用CodeActionProvider的provideCodeActions()方法,返回所有绑定了具体执行命令名称的CodeAction，
-    //
-    // 触发时机
-    // VS Code 会在以下情况调用 provideCodeActions：
-    // 1. 右键点击代码 → 显示上下文菜单
-    // 2. 点击灯泡图标 💡 → 显示快速修复选项
-    // 3. 按 Cmd +. / Ctrl +. → 显示快速修复面板
-    // 4. 保存文件时（如果配置了 editor.codeActionsOnSave）
-    // 5. 编辑器焦点变化时（VS Code 可能会预先获取）
-    //
-    // providedCodeActionKinds 的作用
-    // providedCodeActionKinds 的作用是过滤，不是绑定实现。
-    // 1. 性能优化 - 避免不必要的调用, 当用户触发 CodeAction 时，VSCode 会询问所有注册的 CodeActionProvider。
-    //    通过设置 providedCodeActionKinds 可以减少不必要的计算。
-    //    * 如果不设置providedCodeActionKinds
-    //      - 当用户点击灯泡图标时, VSCode调用所有provider→你的provider被调用→返回所有 action
-    //    * 如果设置了providedCodeActionKinds[QuickFix]
-    //      - 用户保存文件时 → VS Code 只请求 SourceFixAll → 跳过你的 provider
-    //      - 用户右键点击 → VS Code 请求 QuickFix → 调用你的 provider
-    // 2. 过滤 - 精确匹配配置
-    //    当用户配置了 editor.codeActionsOnSave：
-    //    {
-    //      "editor.codeActionsOnSave": {
-    //      "source.fixAll": "explicit",
-    //        "source.fixAll.shell-format": "always"
-    //    }
-    //    VS Code 会：
-    //      - 只调用声明了 providedCodeActionKinds: [..., SourceFixAll] 的 provider
-    //      - 过滤掉没有声明 SourceFixAll 的 provider
-    // 3. 工作流程示例
-    //    假设有两个扩展：
-    //     - Extension A: providedCodeActionKinds: [QuickFix]
-    //     - Extension B(你的): providedCodeActionKinds: [QuickFix, SourceFixAll.append('shell-format')]
-    //
-    //    |用户操作|调用A|	调用你的扩展|
-    //    | :-----: | :--: | :-------: |
-    //    |保存文件（请求 SourceFixAll|✗|✓|
-    //    |保存文件（请求 SourceFixAll.shell - format|✗|✓|
-    //
-    // QuickFix 和 SourceFixAll 的区别
-    //
-    // vscode.CodeActionKind.QuickFix
-    //  - 用途：修复特定的、局部的问题
-    //  - 触发方式：在代码中右键或按 Cmd +.时显示的灯泡菜单
-    //  - 不需要自定义子类型，因为它不通过 codeActionsOnSave 触发
-    //
-    // vscode.CodeActionKind.SourceFixAll.${PackageInfo.extensionName}
-    //   - 用途：修复整个文档的所有问题
-    //   - 触发方式：通过 editor.codeActionsOnSave 配置在保存时自动执行
-    //   - 需要自定义子类型（如.append('shell-format')），这样才能在 codeActionsOnSave 中精确控制
-    //
-    // 为什么不需要给 QuickFix append？
-    // 1. QuickFix 不在 codeActionsOnSave 中使用
-    //    editor.codeActionsOnSave 只支持 SourceFixAll 类型的 CodeAction，不支持 QuickFix 类型。
-    // 2. QuickFix 是用户手动触发的, 此时不需要区分是哪个扩展的 QuickFix，因为用户已经选中了文档或问题。
-    //    当你在代码上看到错误提示时：
-    //    - 点击灯泡图标 💡
-    //    - 或按 Cmd +. / Ctrl +.
-    //
+    // registerCodeActionsProvider与CodeActionsProvider工作机制参考文档:
+    // - 官方文档:https://code.visualstudio.com/api/references/vscode-api#CodeActionKind
+    // - 本地文档:doc/vscode/extension-api.md
     logger.info("Registering code actions provider!");
     const codeActionProvider = vscode.languages.registerCodeActionsProvider(
         PackageInfo.languageId,
@@ -339,15 +270,24 @@ export function activate(context: vscode.ExtensionContext) {
                 // 这是核心：所有配置缓存在 SettingInfo 中统一管理
                 SettingInfo.refreshCache();
 
-                // 步骤 2: 检查是否需要重新诊断
+                // 步骤 2: 重新初始化插件系统（配置变化可能影响插件参数）
+                logger.info("Reinitializing plugins due to configuration change");
+                initializePlugins();
+
+                // 步骤 4: 激活插件（根据新配置）
+                activatePlugins()
+                    .then(() => {
+                        logger.info("Plugins reactivated successfully");
+                    })
+                    .catch((error) => {
+                        logger.error(`Failed to reactivate plugins: ${String(error)}`);
+                    });
+
+                // 步骤 5: 检查是否需要重新诊断
                 if (SettingInfo.isDiagnosticConfigChanged(event)) {
                     logger.info(
                         "Diagnostic relevant configuration changed, re-diagnosing all documents",
                     );
-
-                    // 失效服务缓存
-                    const serviceManager = ServiceManager.getInstance();
-                    serviceManager.invalidate();
 
                     // 重新诊断所有文档
                     const results = await diagnoseAllShellScripts();

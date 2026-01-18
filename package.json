@@ -41,16 +41,6 @@
             "type": "object",
             "title": "Shell Format",
             "properties": {
-                "shell-format.shellcheckPath": {
-                    "type": "string",
-                    "default": "shellcheck",
-                    "description": "Path to shellcheck executable"
-                },
-                "shell-format.shfmtPath": {
-                    "type": "string",
-                    "default": "shfmt",
-                    "description": "Path to shfmt executable"
-                },
                 "shell-format.tabSize": {
                     "type": [
                         "number",
@@ -103,17 +93,69 @@
                     ],
                     "default": "showProblem",
                     "description": "How to handle shfmt errors"
+                },
+                "shell-format.plugins.shfmt": {
+                    "type": "object",
+                    "default": {
+                        "enabled": true,
+                        "path": "shfmt"
+                    },
+                    "properties": {
+                        "enabled": {
+                            "type": "boolean",
+                            "default": true,
+                            "description": "Enable or disable shfmt plugin"
+                        },
+                        "path": {
+                            "type": "string",
+                            "default": "shfmt",
+                            "description": "Path to shfmt executable"
+                        }
+                    },
+                    "description": "Shfmt plugin configuration"
+                },
+                "shell-format.plugins.shellcheck": {
+                    "type": "object",
+                    "default": {
+                        "enabled": true,
+                        "path": "shellcheck"
+                    },
+                    "properties": {
+                        "enabled": {
+                            "type": "boolean",
+                            "default": true,
+                            "description": "Enable or disable shellcheck plugin"
+                        },
+                        "path": {
+                            "type": "string",
+                            "default": "shellcheck",
+                            "description": "Path to shellcheck executable"
+                        }
+                    },
+                    "description": "Shellcheck plugin configuration"
                 }
             }
         },
         "commands": [
             {
                 "command": "shell-format.formatDocument",
-                "title": "Format document with shell-format"
+                "title": "shell-format: Format document"
             },
             {
                 "command": "shell-format.fixAllProblems",
-                "title": "Fix all problems with shell-format"
+                "title": "shell-format: Fix all problems"
+            },
+            {
+                "command": "shell-format.showPerformanceReport",
+                "title": "shell-format: Show performance report"
+            },
+            {
+                "command": "shell-format.resetPerformanceMetrics",
+                "title": "shell-format: Reset shell-format performance metrics"
+            },
+            {
+                "command": "shell-format.showPluginStatus",
+                "title": "shell-format: Show plugin status"
             }
         ],
         "codeActions": [
@@ -134,7 +176,7 @@
         ]
     },
     "scripts": {
-        "package:extension": "npm run package-readme && npx @vscode/vsce package && npm run restore-readme && npm run clean",
+        "package:extension": "bash scripts/safe-package.sh",
         "install:extension": "npm run package:extension && code --install-extension $(ls shell-format-*.vsix) --extensions-dir ~/.vscode/extensions",
         "vscode:prepublish": "npm run compile",
         "clean": "rm -rf dist/*",
@@ -143,8 +185,11 @@
         "pretest": "npm run compile",
         "lint": "eslint src --ext ts",
         "test": "node test/run.js",
-        "package-readme": "mv README.md README.md.bak && cp doc/user/README.md README.md",
-        "restore-readme": "mv -f README.md.bak README.md"
+        "readme:backup": "bash scripts/manage-readme.sh backup",
+        "readme:replace": "bash scripts/manage-readme.sh replace",
+        "readme:restore": "bash scripts/manage-readme.sh restore",
+        "readme:check": "bash scripts/manage-readme.sh check",
+        "test:readme:backup": "bash scripts/test-readme-backup.sh"
     },
     "devDependencies": {
         "@types/node": "^20.0.0",

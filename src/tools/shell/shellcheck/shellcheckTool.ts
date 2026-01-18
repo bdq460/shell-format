@@ -21,7 +21,7 @@ export interface ShellcheckOptions {
  * shellcheck 工具类
  */
 export class ShellcheckTool {
-    private DefaultArges = ["-f", "gcc"];
+    private defaultArges = ["-f", "gcc"];
     private commandPath: string;
 
     constructor(commandPath?: string) {
@@ -32,7 +32,7 @@ export class ShellcheckTool {
      * 检查 Shell 脚本
      */
     async check(options: ShellcheckOptions): Promise<ToolResult> {
-        const args = [...(options.commandArgs || this.DefaultArges)];
+        const args = [...(options.commandArgs || this.defaultArges)];
         // 如果提供了content，使用stdin模式，添加'-'作为文件名占位符
         const fileNameOrStdin = options.content ? "-" : options.file;
         args.push(fileNameOrStdin);

@@ -197,7 +197,16 @@ export class LoggerAdapter implements Logger, vscode.Disposable {
         const formattedMessage = this.formatMessage(message, level);
 
         // 输出到控制台 (可以从"帮助 -> 切换开发人员"工具打开控制台界面)
-        console.log(formattedMessage);
+        switch (level) {
+            case LogLevel.DEBUG:
+                console.debug(formattedMessage);
+            case LogLevel.WARN:
+                console.warn(formattedMessage);
+            case LogLevel.ERROR:
+                console.error(formattedMessage);
+            default:
+                console.info(formattedMessage);
+        }
 
         // 输出到输出通道
         if (SettingInfo.getLog().enabled) {

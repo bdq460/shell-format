@@ -3,19 +3,20 @@
  * 提供文档格式化功能
  *
  * 架构优化：
- * 1. 使用 ServiceManager 单例管理服务实例
- * 2. 自动处理配置变化和缓存
+ * 1. 使用 PluginManager 管理插件实例
+ * 2. 直接调用 Tool 层，减少中间层
+ * 3. 性能监控：记录格式化执行时间
  */
 
 import * as vscode from "vscode";
-import { FormatterAdapter } from "../adapters";
-import { ServiceManager } from "../services";
-import { logger } from "../utils/log";
+import { PERFORMANCE_METRICS } from "../metrics";
+import { getPluginManager } from "../plugins";
+import { logger, startTimer } from "../utils";
 
 // ==================== 格式化执行层 ====================
 
 /**
- * 执行格式化
+ * 执行格式化（使用纯插件方案）
  * @param document 文档对象
  * @param token 取消令牌
  * @returns TextEdit 数组
@@ -26,14 +27,24 @@ async function runFormat(
 ): Promise<vscode.TextEdit[]> {
     logger.info(`Start format document: ${document.fileName}`);
 
-    // 使用 ServiceManager 获取服务实例（自动处理缓存和配置变化）
-    const serviceManager = ServiceManager.getInstance();
-    const result = await serviceManager
-        .getShfmtService()
-        .format(document.fileName, token);
+    // 使用 PluginManager 执行格式化
+    const pluginManager = getPluginManager();
 
-    // 返回格式化结果（格式化模块不处理诊断）
-    return FormatterAdapter.convert(result, document);
+    const timer = startTimer(PERFORMANCE_METRICS.FORMAT_DURATION);
+    try {
+        const edits = await pluginManager.format(document, {
+            token,
+            timeout: undefined,
+        });
+        timer.stop();
+
+        logger.debug(`Format returned ${edits.length} edits`);
+        return edits;
+    } catch (error) {
+        timer.stop();
+        logger.error(`Format failed: ${String(error)}`);
+        return [];
+    }
 }
 
 // ==================== 对外 API 层 ====================
@@ -41,16 +52,19 @@ async function runFormat(
 /**
  * 格式化文档
  * @param document 文档对象
- * @param _options 格式化选项（未使用，由 shfmt 内部处理）
+ * @param _options 格式化选项（未使用，由插件内部处理）
  * @param token 取消令牌
+ * @param preferContentMode 是否优先使用content模式（未使用，纯插件方案总是使用content模式）
  * @returns TextEdit 数组
  *
- * 使用 shfmt 格式化文档, 并返回格式化后的内容
+ * 使用插件格式化文档, 并返回格式化后的内容
  */
 export async function formatDocument(
     document: vscode.TextDocument,
     _options?: vscode.FormattingOptions,
-    _token?: vscode.CancellationToken,
+    token?: vscode.CancellationToken,
+    preferContentMode = false,
 ): Promise<vscode.TextEdit[]> {
-    return await runFormat(document, _token);
+    // 纯插件方案统一使用 content 模式
+    return await runFormat(document, token);
 }

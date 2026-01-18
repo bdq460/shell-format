@@ -24,10 +24,15 @@ export class ShfmtTool {
         fileName: string,
         options?: Partial<ShfmtFormatOptions>,
     ): Promise<ToolResult> {
-        const args = this.buildFormatArgs(options || {}).concat([fileName]);
+        const args = this.buildFormatArgs(options || {});
+        // 如果提供了content，使用stdin模式，添加'-'作为文件名占位符
+        const fileNameOrStdin = options?.content ? "-" : fileName;
+        args.push(fileNameOrStdin);
+
         const result = await execute(this.commandPath, {
             args: args,
             token: options?.token,
+            stdin: options?.content,
         });
         return parseShfmtOutput(result, "format");
     }
@@ -78,32 +83,12 @@ export class ShfmtTool {
         args.push("-d"); // 检查模式
         return args;
     }
-
-    /**
-     * 构建完整的命令字符串（用于错误信息显示）
-     * @param options 格式化选项
-     * @param mode 操作模式：'format' 或 'check'
-     * @returns 完整的命令字符串，如 'shfmt -i 2 -bn -ci -sr'
-     */
-    buildCommandString(
-        options: ShfmtFormatOptions,
-        mode: "format" | "check" = "format",
-    ): string {
-        const command = options.commandPath || "shfmt";
-        const args =
-            mode === "check"
-                ? this.buildCheckArgs(options)
-                : this.buildFormatArgs(options);
-        return `${command} ${args.join(" ")}`;
-    }
 }
 
 /**
  * shfmt 格式化选项
  */
 export interface ShfmtFormatOptions {
-    /** shfmt 可执行文件路径 */
-    commandPath?: string;
     /** 缩进空格数 */
     indent?: number;
     /** 二元操作符换行 */
@@ -114,12 +99,11 @@ export interface ShfmtFormatOptions {
     spaceRedirects?: boolean;
     /** 取消令牌 */
     token?: CancellationToken;
+    /** 文件内容（可选，用于stdin模式） */
+    content?: string;
 }
 
 /**
  * shfmt 检查选项
  */
-export interface ShfmtCheckOptions extends ShfmtFormatOptions {
-    /** 文件内容（可选，用于stdin模式） */
-    content?: string;
-}
+export interface ShfmtCheckOptions extends ShfmtFormatOptions { }

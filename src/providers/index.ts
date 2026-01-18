@@ -5,7 +5,8 @@
 
 import * as vscode from "vscode";
 import { PackageInfo } from "../config";
-import { logger } from "../utils/log";
+import { PERFORMANCE_METRICS } from "../metrics";
+import { logger, startTimer } from "../utils";
 
 /**
  * ShellFormat Code Action 提供者
@@ -32,25 +33,29 @@ export class ShellFormatCodeActionProvider
         context: vscode.CodeActionContext,
         _token: vscode.CancellationToken,
     ): vscode.ProviderResult<(vscode.CodeAction | vscode.Command)[]> {
+        const timer = startTimer(
+            PERFORMANCE_METRICS.PROVIDER_CODE_ACTIONS_DURATION,
+        );
+        logger.info(`Code Actions requested for ${document.fileName}`);
+
         const actions: vscode.CodeAction[] = [];
 
-        logger.info(`========== provideCodeActions called ==========`);
-        logger.info(`Document: ${document.fileName}`);
-        logger.info(
-            `Range: [${range.start.line}, ${range.start.character}] - [${range.end.line}, ${range.end.character}]`,
+        // 调试信息：详细上下文
+        logger.debug(`Trigger kind: ${context.triggerKind}`);
+        logger.debug(
+            `Requested range: [${range.start.line}, ${range.start.character}] - [${range.end.line}, ${range.end.character}]`,
         );
-        logger.info(
-            `context.only: ${context.only ? context.only.value : "undefined"}`,
-        );
-        logger.info(`context.triggerKind: ${context.triggerKind}`);
-        logger.info(`context.diagnostics: ${JSON.stringify(context.diagnostics)}`);
-        logger.info(`context.diagnostics.length: ${context.diagnostics?.length}`);
+        if (context.only) {
+            logger.debug(`Code action kind filter: ${context.only.value}`);
+        }
 
         // 从 DiagnosticCollection 获取当前文档的所有诊断
         const documentDiagnostics =
             this.diagnosticCollection.get(document.uri) || [];
 
-        logger.info(`documentDiagnostics.length: ${documentDiagnostics.length}`);
+        logger.debug(
+            `Document has ${documentDiagnostics.length} total diagnostics`,
+        );
 
         // 检查是否有来自本扩展的诊断
         const matchingDiagnostics = documentDiagnostics.filter(
@@ -59,26 +64,25 @@ export class ShellFormatCodeActionProvider
 
         // 如果没有来自本扩展的诊断问题，则不提供任何操作
         if (matchingDiagnostics.length === 0) {
-            logger.info("No matching diagnostics found from this extension.");
+            logger.debug("No matching diagnostics from this extension");
+            timer.stop();
             return actions;
         }
 
         logger.info(
-            `Found ${matchingDiagnostics.length} matching diagnostics from this extension.`,
+            `Found ${matchingDiagnostics.length} diagnostics from this extension`,
         );
 
         // 策略：
         // - "Fix all problems with shell-format" 支持 SourceFixAll（"Fix All" 命令）
         // - "Fix this issue with shell-format" 只在 context.diagnostics 有诊断时显示（光标在错误位置）
 
-        // 如果 context.only 是 SourceFixAll，则返回FixAll action
+        // 如果 context.only 是 SourceFixAll，则返回 FixAll action
         if (
             context.only &&
             context.only.contains(vscode.CodeActionKind.SourceFixAll)
         ) {
-            logger.info(
-                `context.only is SourceFixAll, providing Fix All action!context.only:${context.only.value}`,
-            );
+            logger.debug(`SourceFixAll requested, providing Fix All action`);
             const fixAllAction = new vscode.CodeAction(
                 PackageInfo.codeActionFixAllTitle,
                 vscode.CodeActionKind.SourceFixAll,
@@ -89,9 +93,9 @@ export class ShellFormatCodeActionProvider
                 arguments: [document.uri],
             };
             actions.push(fixAllAction);
-            logger.info(
-                `Added SourceFixAll action: ${PackageInfo.codeActionFixAllTitle}`,
-            );
+
+            timer.stop();
+            logger.info(`Provided SourceFixAll action for ${document.fileName}`);
             return actions;
         }
 
@@ -102,8 +106,8 @@ export class ShellFormatCodeActionProvider
                 (d) => d.source === PackageInfo.diagnosticSource,
             );
             if (contextMatchingDiagnostics.length > 0) {
-                logger.info(
-                    `Context has matching diagnostics, will provide "Fix this issue"`,
+                logger.debug(
+                    `Providing QuickFix for ${contextMatchingDiagnostics.length} diagnostics`,
                 );
                 // 只为第一个匹配的诊断创建 QuickFix，避免重复
                 const diagnostic = contextMatchingDiagnostics[0];
@@ -120,14 +124,9 @@ export class ShellFormatCodeActionProvider
                     arguments: [document.uri],
                 };
                 actions.push(fixThisAction);
-                logger.info(
-                    `Added QuickFix action: ${PackageInfo.codeActionQuickFixTitle}`,
-                );
             } else {
-                logger.info(`Context has diagnostics but none from this extension.`);
+                logger.debug("Context has diagnostics but none from this extension");
             }
-        } else {
-            logger.info(`Context has no diagnostics.`);
         }
 
         // 为整个文档提供独立的 QuickFix: "Fix all problems with shell-format"
@@ -142,16 +141,11 @@ export class ShellFormatCodeActionProvider
             arguments: [document.uri],
         };
         actions.push(fixAllAction);
-        logger.info(
-            `Added QuickFix action for whole document: ${PackageInfo.codeActionFixAllTitle}`,
-        );
 
-        logger.info(`Final total actions returned: ${actions.length}`);
-        for (let i = 0; i < actions.length; i++) {
-            logger.info(
-                `Action ${i + 1}: ${actions[i].title}, kind: ${actions[i].kind?.value}`,
-            );
-        }
+        timer.stop();
+        logger.info(
+            `Provided ${actions.length} code actions for ${document.fileName}`,
+        );
 
         return actions;
     }

@@ -20,11 +20,13 @@ interface LogConfig {
  * 缓存从 settings.json 读取的配置值
  */
 interface ConfigCache {
-    shfmtPath: string;
-    shellcheckPath: string;
     tabSize: number | string;
     log: LogConfig;
     onError: string;
+    plugins: {
+        shfmt: { enabled: boolean; path: string };
+        shellcheck: { enabled: boolean; path: string };
+    };
 }
 
 /**
@@ -65,11 +67,10 @@ export class SettingInfo {
      */
     static refreshCache(): void {
         this.configCache = {
-            shfmtPath: this.getShfmtPathImpl(),
-            shellcheckPath: this.getShellcheckPathImpl(),
             tabSize: this.getTabSizeImpl(),
             log: this.getLogImpl(),
             onError: this.getOnErrorImpl(),
+            plugins: this.getPluginsImpl(),
         };
     }
 
@@ -93,16 +94,6 @@ export class SettingInfo {
 
     // ==================== 内部实现：从 VSCode 读取配置（不使用缓存） ====================
 
-    private static getShfmtPathImpl(): string {
-        const config = this.getConfig();
-        return config.get<string>("shfmtPath", PackageInfo.defaultShfmtPath);
-    }
-
-    private static getShellcheckPathImpl(): string {
-        const config = this.getConfig();
-        return config.get<string>("shellcheck", PackageInfo.defaultShellCheckPath);
-    }
-
     private static getLogImpl(): LogConfig {
         const config = this.getConfig();
         return config.get<LogConfig>("log", PackageInfo.defaultLog);
@@ -118,6 +109,17 @@ export class SettingInfo {
         return config.get<string>("onError", PackageInfo.defaultOnError);
     }
 
+    private static getPluginsImpl(): {
+        shfmt: { enabled: boolean; path: string };
+        shellcheck: { enabled: boolean; path: string };
+    } {
+        const config = this.getConfig();
+        return config.get("plugins", {
+            shfmt: { enabled: true, path: PackageInfo.defaultShfmtPath },
+            shellcheck: { enabled: true, path: PackageInfo.defaultShellCheckPath },
+        });
+    }
+
     /**
      * 获取当前缓存快照
      * @returns 当前缓存的配置快照，用于服务层判断配置是否变化
@@ -129,13 +131,25 @@ export class SettingInfo {
 
     // ==================== 配置变更检测 ====================
 
-    // ==================== shellcheck 路径配置 ====================
-    static getShellcheckPath(): string {
+    // ==================== 插件配置 ====================
+
+    /**
+     * 获取 shfmt 插件是否启用
+     * @returns 是否启用 shfmt 插件，默认为 true
+     */
+    static isShfmtEnabled(): boolean {
         this.ensureCacheInitialized();
-        return this.configCache!.shellcheckPath;
+        return this.configCache!.plugins.shfmt.enabled;
     }
 
-    // ==================== shfmt 路径配置 ====================
+    /**
+     * 获取 shellcheck 插件是否启用
+     * @returns 是否启用 shellcheck 插件，默认为 true
+     */
+    static isShellcheckEnabled(): boolean {
+        this.ensureCacheInitialized();
+        return this.configCache!.plugins.shellcheck.enabled;
+    }
 
     /**
      * 获取 shfmt 可执行文件路径
@@ -143,7 +157,16 @@ export class SettingInfo {
      */
     static getShfmtPath(): string {
         this.ensureCacheInitialized();
-        return this.configCache!.shfmtPath;
+        return this.configCache!.plugins.shfmt.path;
+    }
+
+    /**
+     * 获取 shellcheck 可执行文件路径
+     * @returns shellcheck 可执行文件的路径，优先使用用户配置，否则使用默认值 'shellcheck'
+     */
+    static getShellcheckPath(): string {
+        this.ensureCacheInitialized();
+        return this.configCache!.plugins.shellcheck.path;
     }
 
     // ==================== log 配置 ====================
@@ -176,6 +199,7 @@ export class SettingInfo {
             return tabSetting;
         }
         // 设置为 'vscode'或其他未知值, 默认使用 vscode 缩进
+        // @todo editor.tabSize也要缓存起来的吧?
         return vscode.workspace.getConfiguration("editor").get<number>("tabSize");
     }
 
@@ -202,8 +226,8 @@ export class SettingInfo {
      * 这些配置变化后需要重新诊断所有文件
      */
     static readonly DIAGNOSTIC_RELEVANT_CONFIG_KEYS = [
-        "shell-format.shfmtPath",
-        "shell-format.shellcheckPath",
+        "shell-format.plugins.shfmt",
+        "shell-format.plugins.shellcheck",
         "shell-format.tabSize",
         "shell-format.onError",
     ] as const;

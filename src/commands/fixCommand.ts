@@ -3,11 +3,11 @@
  * 提供"修复所有问题"命令的实现
  */
 
-import * as vscode from 'vscode';
-import { PackageInfo } from '../config';
-import { diagnoseDocument } from '../diagnostics';
-import { formatDocument } from '../formatters';
-import { logger } from '../utils/log';
+import * as vscode from "vscode";
+import { PackageInfo } from "../config";
+import { diagnoseDocument } from "../diagnostics";
+import { formatDocument } from "../formatters";
+import { logger } from "../utils/log";
 
 /**
  * 注册修复所有问题命令
@@ -16,35 +16,35 @@ import { logger } from '../utils/log';
  * @param diagnosticCollection VSCode 诊断集合
  */
 export function registerFixAllCommand(
-    diagnosticCollection: vscode.DiagnosticCollection
+    diagnosticCollection: vscode.DiagnosticCollection,
 ): vscode.Disposable {
-    logger.info('Registering fix all problems command');
+    logger.info("Registering fix all problems command");
     return vscode.commands.registerCommand(
         PackageInfo.commandFixAllProblems,
         async (uri?: vscode.Uri) => {
-
             logger.info(`Start fix all problems! URI: ${uri}`);
             let document: vscode.TextDocument | undefined;
 
             if (uri) {
                 // 从问题面板的修复命令调用
                 document = vscode.workspace.textDocuments.find(
-                    doc => doc.uri.toString() === uri.toString()
+                    (doc) => doc.uri.toString() === uri.toString(),
                 );
             } else if (vscode.window.activeTextEditor) {
                 // 从命令面板调用
                 document = vscode.window.activeTextEditor.document;
             }
             if (!document) {
-                logger.info('Fix all problems command triggered! No document found');
+                logger.info("Fix all problems command triggered! No document found");
                 return;
             }
 
             logger.info(`Start fix all problems for: ${document.fileName}`);
 
             // 通过formatDocument生成修复操作
-            logger.info('Generating fixes by invoking format document');
-            const edits = await formatDocument(document);
+            // 使用content模式，确保修复基于当前编辑器中的内容，与诊断保持一致
+            logger.info("Generating fixes by invoking format document");
+            const edits = await formatDocument(document, undefined, undefined, true);
             if (edits && edits.length > 0) {
                 logger.info(`Applying ${edits.length} formatting fix(es)`);
                 // 创建 WorkspaceEdit用于存储修复操作
@@ -60,23 +60,23 @@ export function registerFixAllCommand(
                 diagnosticCollection.set(document.uri, diagnostics);
                 // 显示成功消息
                 vscode.window.showInformationMessage(
-                    "All problems fixed successfully."
+                    "All problems fixed successfully.",
                 );
             } else if (edits && edits.length === 0) {
-                logger.info('No formatting fixes return.');
-                // 无修复操作，直接诊断
+                logger.info("No formatting fixes return.");
+                // 无修复操作，直接诊断（使用content模式，与诊断保持一致）
                 const diagnostics = await diagnoseDocument(document, undefined, true);
                 diagnosticCollection.set(document.uri, diagnostics);
                 const hasDiagnostics = diagnostics.length > 0;
                 if (hasDiagnostics) {
-                    logger.info('No formatting fixes needed, but diagnostics found.');
+                    logger.info("No formatting fixes needed, but diagnostics found.");
                     vscode.window.showWarningMessage(
-                        `Formatting failed with warnings. Check the Problems panel.`
+                        `Formatting failed with warnings. Check the Problems panel.`,
                     );
                 } else {
-                    logger.info('No formatting fixes needed.');
+                    logger.info("No formatting fixes needed.");
                 }
             }
-        }
+        },
     );
 }

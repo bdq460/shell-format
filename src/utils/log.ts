@@ -109,7 +109,7 @@ export function shouldLogByLevel(
  */
 export interface Logger {
     /** 调试信息 - 仅在开发调试时输出 */
-    debug?(message: string): void;
+    debug(message: string): void;
 
     /** 一般信息 - 常规消息提示 */
     info(message: string): void;

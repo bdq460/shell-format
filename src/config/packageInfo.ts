@@ -3,7 +3,7 @@
  * 统一管理从 package.json 读取的静态插件信息
  */
 
-import * as packageJson from '../../package.json';
+import * as packageJson from "../../package.json";
 
 interface Command {
     command: string;
@@ -79,7 +79,7 @@ export class PackageInfo {
      * @returns shell 脚本的语言标识符，默认为 'shellscript'
      */
     static get languageId(): string {
-        return packageJson.contributes?.languages?.[0]?.id || 'shellscript';
+        return packageJson.contributes?.languages?.[0]?.id || "shellscript";
     }
 
     /**
@@ -95,7 +95,13 @@ export class PackageInfo {
      * @returns 支持的文件扩展名数组，如 ['.sh', '.bash', '.zsh']
      */
     static get fileExtensions(): string[] {
-        return packageJson.contributes?.languages?.[0]?.extensions || ['.sh', '.bash', '.zsh'];
+        return (
+            packageJson.contributes?.languages?.[0]?.extensions || [
+                ".sh",
+                ".bash",
+                ".zsh",
+            ]
+        );
     }
 
     // ==================== 命令配置 ====================
@@ -114,8 +120,35 @@ export class PackageInfo {
      * @returns 修复所有问题命令的完整ID
      */
     static get commandFixAllProblems(): string {
-        return packageJson.contributes?.commands?.find((c: Command) => c.command?.includes('fixAllProblems'))?.command
-            || 'shell-format.fixAllProblems';
+        return (
+            packageJson.contributes?.commands?.find((c: Command) =>
+                c.command?.includes("fixAllProblems"),
+            )?.command || "shell-format.fixAllProblems"
+        );
+    }
+
+    /**
+     * 获取显示性能报告的命令ID
+     * @returns 显示性能报告命令的完整ID
+     */
+    static get commandShowPerformanceReport(): string {
+        return (
+            packageJson.contributes?.commands?.find((c: Command) =>
+                c.command?.includes("showPerformanceReport"),
+            )?.command || "shell-format.showPerformanceReport"
+        );
+    }
+
+    /**
+     * 获取重置性能指标的命令ID
+     * @returns 重置性能指标命令的完整ID
+     */
+    static get commandResetPerformanceMetrics(): string {
+        return (
+            packageJson.contributes?.commands?.find((c: Command) =>
+                c.command?.includes("resetPerformanceMetrics"),
+            )?.command || "shell-format.resetPerformanceMetrics"
+        );
     }
 
     /**
@@ -123,8 +156,11 @@ export class PackageInfo {
      * @returns 格式化文档命令在命令面板中显示的标题
      */
     static get commandFormatTitle(): string {
-        return packageJson.contributes?.commands?.find((c: Command) => c.command?.includes('formatDocument'))?.title
-            || 'Format Document';
+        return (
+            packageJson.contributes?.commands?.find((c: Command) =>
+                c.command?.includes("formatDocument"),
+            )?.title || "Format Document"
+        );
     }
 
     /**
@@ -132,8 +168,11 @@ export class PackageInfo {
      * @returns 修复所有问题命令在命令面板中显示的标题
      */
     static get commandFixAllTitle(): string {
-        return packageJson.contributes?.commands?.find((c: Command) => c.command?.includes('fixAllProblems'))?.title
-            || 'Fix All Problems';
+        return (
+            packageJson.contributes?.commands?.find((c: Command) =>
+                c.command?.includes("fixAllProblems"),
+            )?.title || "Fix All Problems"
+        );
     }
 
     // ==================== CodeAction 配置 ====================
@@ -143,8 +182,11 @@ export class PackageInfo {
      * @returns 快速修复操作在代码问题灯泡中显示的标题
      */
     static get codeActionQuickFixTitle(): string {
-        return packageJson.contributes?.codeActions?.find((c: CodeAction) => c.kind?.includes('quickfix'))?.title
-            || 'Fix this issue with shell-format';
+        return (
+            packageJson.contributes?.codeActions?.find((c: CodeAction) =>
+                c.kind?.includes("quickfix"),
+            )?.title || "Fix this issue with shell-format"
+        );
     }
 
     /**
@@ -152,8 +194,11 @@ export class PackageInfo {
      * @returns 修复所有操作在代码问题灯泡中显示的标题
      */
     static get codeActionFixAllTitle(): string {
-        return packageJson.contributes?.codeActions?.find((c: CodeAction) => c.kind?.includes('source.fixAll'))?.title
-            || 'Fix all with shell-format';
+        return (
+            packageJson.contributes?.codeActions?.find((c: CodeAction) =>
+                c.kind?.includes("source.fixAll"),
+            )?.title || "Fix all with shell-format"
+        );
     }
 
     // ==================== 诊断配置 ====================
@@ -172,9 +217,12 @@ export class PackageInfo {
      * @returns shellcheck 可执行文件的默认路径，默认为 'shellcheck'
      */
     static get defaultShellCheckPath(): string {
-        const configProperties = packageJson.contributes?.configuration?.properties as any;
-        return configProperties?.[`${PackageInfo.extensionName}.shellcheckPath`]?.default
-            || 'shellcheck';
+        const configProperties = packageJson.contributes?.configuration
+            ?.properties as any;
+        return (
+            configProperties?.[`${PackageInfo.extensionName}.shellcheckPath`]
+                ?.default || "shellcheck"
+        );
     }
 
     // ==================== shfmt 路径配置 ====================
@@ -184,9 +232,12 @@ export class PackageInfo {
      * @returns shfmt 可执行文件的默认路径，默认为 'shfmt'
      */
     static get defaultShfmtPath(): string {
-        const configProperties = packageJson.contributes?.configuration?.properties as any;
-        return configProperties?.[`${PackageInfo.extensionName}.shfmtPath`]?.default
-            || 'shfmt';
+        const configProperties = packageJson.contributes?.configuration
+            ?.properties as any;
+        return (
+            configProperties?.[`${PackageInfo.extensionName}.shfmtPath`]?.default ||
+            "shfmt"
+        );
     }
 
     /**
@@ -194,7 +245,7 @@ export class PackageInfo {
      * @returns shfmt 的默认参数数组，如 ['-i', '2', '-bn', '-ci', '-sr'] 或 ['-tabs', '-bn', '-ci', '-sr']
      */
     static get defaultShfmtArgs(): string[] {
-        return ['-bn', '-ci', '-sr']
+        return ["-bn", "-ci", "-sr"];
     }
 
     /**
@@ -206,9 +257,15 @@ export class PackageInfo {
         level: string;
         format: string;
     } {
-        const configProperties = packageJson.contributes?.configuration?.properties as any;
-        return configProperties?.[`${PackageInfo.extensionName}.log`]?.default
-            || { enabled: false, level: 'info', format: 'timestamp' };
+        const configProperties = packageJson.contributes?.configuration
+            ?.properties as any;
+        return (
+            configProperties?.[`${PackageInfo.extensionName}.log`]?.default || {
+                enabled: false,
+                level: "info",
+                format: "timestamp",
+            }
+        );
     }
 
     /**
@@ -216,9 +273,12 @@ export class PackageInfo {
      * @returns 默认的错误处理方式，可选值为 'showProblem' 或 'ignore'
      */
     static get defaultOnError(): string {
-        const configProperties = packageJson.contributes?.configuration?.properties as any;
-        return configProperties?.[`${PackageInfo.extensionName}.onError`]?.default
-            || 'showProblem';
+        const configProperties = packageJson.contributes?.configuration
+            ?.properties as any;
+        return (
+            configProperties?.[`${PackageInfo.extensionName}.onError`]?.default ||
+            "showProblem"
+        );
     }
 
     /**
@@ -230,8 +290,11 @@ export class PackageInfo {
      * 默认值为 'vscode'
      */
     static get defaultTabSize(): number | string {
-        const configProperties = packageJson.contributes?.configuration?.properties as any;
-        return configProperties?.[`${PackageInfo.extensionName}.tabSize`]?.default
-            || "vscode";
+        const configProperties = packageJson.contributes?.configuration
+            ?.properties as any;
+        return (
+            configProperties?.[`${PackageInfo.extensionName}.tabSize`]?.default ||
+            "vscode"
+        );
     }
 }
