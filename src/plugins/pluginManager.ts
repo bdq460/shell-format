@@ -141,7 +141,9 @@ export class PluginManager {
         document: vscode.TextDocument,
         options: FormatOptions,
     ): Promise<vscode.TextEdit[]> {
-        const timer = startTimer(PERFORMANCE_METRICS.PLUGIN_EXECUTE_DURATION);
+        const timer = startTimer(
+            PERFORMANCE_METRICS.PLUGIN_EXECUTE_FORMAT_DURATION,
+        );
         logger.info(
             `Formatting document: ${document.fileName} with ${this.activePlugins.size} active plugins`,
         );
@@ -200,7 +202,7 @@ export class PluginManager {
         document: vscode.TextDocument,
         options: CheckOptions,
     ): Promise<CheckResult> {
-        const timer = startTimer(PERFORMANCE_METRICS.PLUGIN_EXECUTE_DURATION);
+        const timer = startTimer(PERFORMANCE_METRICS.PLUGIN_EXECUTE_CHECK_DURATION);
         logger.info(
             `Checking document: ${document.fileName} with ${this.activePlugins.size} active plugins`,
         );

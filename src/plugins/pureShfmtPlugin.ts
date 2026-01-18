@@ -10,8 +10,10 @@ import { DiagnosticAdapter } from "../adapters/diagnosticAdapter";
 import { FormatterAdapter } from "../adapters/formatterAdapter";
 import { SettingInfo } from "../config";
 import { PackageInfo } from "../config/packageInfo";
+import { PERFORMANCE_METRICS } from "../metrics";
 import { ShfmtFormatOptions, ShfmtTool } from "../tools/shell/shfmt/shfmtTool";
 import { logger } from "../utils/log";
+import { startTimer } from "../utils/performance/monitor";
 import {
     CheckOptions,
     CheckResult,
@@ -75,6 +77,7 @@ export class PureShfmtPlugin implements IFormatPlugin {
             `PureShfmtPlugin.format called with options: ${JSON.stringify(options)}`,
         );
 
+        const timer = startTimer(PERFORMANCE_METRICS.SHFMT_FORMAT_DURATION);
         try {
             const result = await this.tool.format("-", {
                 ...this.defaultShfmtOptions,
@@ -83,10 +86,12 @@ export class PureShfmtPlugin implements IFormatPlugin {
             });
 
             const edits = FormatterAdapter.convert(result, document);
+            timer.stop();
 
             logger.debug(`PureShfmtPlugin.format returned ${edits.length} edits`);
             return edits;
         } catch (error) {
+            timer.stop();
             logger.error(`PureShfmtPlugin.format failed: ${String(error)}`);
             return [];
         }
@@ -102,7 +107,7 @@ export class PureShfmtPlugin implements IFormatPlugin {
         logger.debug(
             `PureShfmtPlugin.check called with options: ${JSON.stringify(options)}`,
         );
-
+        const timer = startTimer(PERFORMANCE_METRICS.SHFMT_DIAGNOSE_DURATION);
         try {
             const result = await this.tool.check("-", {
                 ...this.defaultShfmtOptions,
@@ -121,6 +126,8 @@ export class PureShfmtPlugin implements IFormatPlugin {
                 (diag) => diag.severity === vscode.DiagnosticSeverity.Error,
             );
 
+            timer.stop();
+
             logger.debug(
                 `PureShfmtPlugin.check returned ${diagnostics.length} diagnostics`,
             );
@@ -129,6 +136,7 @@ export class PureShfmtPlugin implements IFormatPlugin {
                 diagnostics,
             };
         } catch (error) {
+            timer.stop();
             logger.error(`PureShfmtPlugin.check failed: ${String(error)}`);
             return {
                 hasErrors: true,

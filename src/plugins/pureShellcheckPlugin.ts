@@ -4,12 +4,13 @@
  * 直接使用 ShellcheckTool，不依赖 Service 层
  * 实现统一的插件接口
  */
-
 import * as vscode from "vscode";
 import { DiagnosticAdapter } from "../adapters/diagnosticAdapter";
 import { PackageInfo } from "../config/packageInfo";
+import { PERFORMANCE_METRICS } from "../metrics";
 import { ShellcheckTool } from "../tools/shell/shellcheck/shellcheckTool";
-import { logger } from "../utils/log";
+import { logger } from "../utils";
+import { startTimer } from "../utils/performance/monitor";
 import {
     CheckOptions,
     CheckResult,
@@ -72,6 +73,7 @@ export class PureShellcheckPlugin implements IFormatPlugin {
             `PureShellcheckPlugin.check called with options: ${JSON.stringify(options)}`,
         );
 
+        const timer = startTimer(PERFORMANCE_METRICS.SHELLCHECK_DIAGNOSE_DURATION);
         try {
             const result = await this.tool.check({
                 file: "-",
@@ -89,6 +91,7 @@ export class PureShellcheckPlugin implements IFormatPlugin {
             const hasErrors = diagnostics.some(
                 (diag) => diag.severity === vscode.DiagnosticSeverity.Error,
             );
+            timer.stop();
 
             logger.debug(
                 `PureShellcheckPlugin.check returned ${diagnostics.length} diagnostics`,
@@ -98,6 +101,7 @@ export class PureShellcheckPlugin implements IFormatPlugin {
                 diagnostics,
             };
         } catch (error) {
+            timer.stop();
             logger.error(`PureShellcheckPlugin.check failed: ${String(error)}`);
             return {
                 hasErrors: true,

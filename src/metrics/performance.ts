@@ -14,7 +14,8 @@ export const PERFORMANCE_METRICS = {
 
     // 插件相关
     PLUGIN_LOAD_DURATION: "plugin_load_duration",
-    PLUGIN_EXECUTE_DURATION: "plugin_execute_duration",
+    PLUGIN_EXECUTE_CHECK_DURATION: "plugin_execute_check_duration",
+    PLUGIN_EXECUTE_FORMAT_DURATION: "plugin_execute_format_duration",
 
     // 服务相关
     SERVICE_INIT_DURATION: "service_init_duration",
