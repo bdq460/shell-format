@@ -134,8 +134,8 @@
         ]
     },
     "scripts": {
-        "package:extension": "npm run package-readme && npx @vscode/vsce package && npm run restore-readme && npm run clean",
-        "install:extension": "npm run package:extension && code --install-extension $(ls shell-format-*.vsix) --extensions-dir ~/.vscode/extensions",
+        "package": "npm run package-readme && npx @vscode/vsce package && npm run restore-readme && npm run clean",
+        "install:extension": "npm run package && code --install-extension $(ls shell-format-*.vsix) --extensions-dir ~/.vscode/extensions",
         "vscode:prepublish": "npm run compile",
         "clean": "rm -rf dist/*",
         "compile": "tsc -p ./",
@@ -144,7 +144,7 @@
         "lint": "eslint src --ext ts",
         "test": "node test/run.js",
         "package-readme": "mv README.md README.md.bak && cp doc/user/README.md README.md",
-        "restore-readme": "mv README.md.bak README.md"
+        "restore-readme": "mv -f README.md.bak README.md"
     },
     "devDependencies": {
         "@types/node": "^20.0.0",
