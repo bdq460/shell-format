@@ -305,24 +305,21 @@ export function activate(context: vscode.ExtensionContext) {
     logger.info("Registering document change listener");
     const changeListener = vscode.workspace.onDidChangeTextDocument(
         async (event) => {
-            // @todo暂时先不实现debounceDiagnose, 编辑时在保存之前文件内容是不会发生变化的, 需要使用stdin的方式进行校验
-            logger.info(`Document change event happened! event:${event}`);
-            return;
             // 只处理 shell 语言文件
-            // if (event.document.languageId !== PackageInfo.languageId) {
-            //     return;
-            // }
-            // // 跳过特殊文件
-            // if (shouldSkipFile(event.document.fileName)) {
-            //     logger.info(
-            //         `Skipping change diagnosis for: ${event.document.fileName} (special file)`,
-            //     );
-            //     return;
-            // }
-            // logger.info(
-            //     `Document change happened, trigger debounceDiagnose for: ${event.document.fileName}`,
-            // );
-            // debounceDiagnose(event.document, diagnosticCollection);
+            if (event.document.languageId !== PackageInfo.languageId) {
+                return;
+            }
+            // 跳过特殊文件
+            if (shouldSkipFile(event.document.fileName)) {
+                logger.info(
+                    `Skipping change diagnosis for: ${event.document.fileName} (special file)`,
+                );
+                return;
+            }
+            logger.info(
+                `Document change happened, trigger debounceDiagnose for: ${event.document.fileName}`,
+            );
+            debounceDiagnose(event.document, diagnosticCollection);
         },
     );
 
@@ -432,7 +429,11 @@ function debounceDiagnose(
 
     // 设置新的定时器
     const timer = setTimeout(async () => {
-        const diagnostics = await diagnoseDocument(document);
+        const diagnostics = await diagnoseDocument(
+            document,
+            undefined,
+            true, // 使用content模式进行诊断
+        );
         diagnosticCollection.set(document.uri, diagnostics);
         // 清除定时器引用
         debounceTimers.delete(uri);

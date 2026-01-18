@@ -56,4 +56,23 @@ export class ShfmtService {
             token,
         });
     }
+
+    /**
+     * 检查内容格式（用于未保存的文档）
+     * @param content 文件内容
+     * @param token 取消令牌
+     */
+    async checkContent(
+        content: string,
+        token?: CancellationToken,
+    ): Promise<ToolResult> {
+        return this.tool.check("", {
+            indent: this.indent,
+            binaryNextLine: true,
+            caseIndent: true,
+            spaceRedirects: true,
+            token,
+            content,
+        });
+    }
 }

@@ -55,8 +55,8 @@ export function registerFixAllCommand(
                 }
                 // 应用修复操作
                 await vscode.workspace.applyEdit(edit);
-                // 修复后重新诊断
-                const diagnostics = await diagnoseDocument(document);
+                // 修复后重新诊断（使用content模式，因为文档已修改但可能未保存）
+                const diagnostics = await diagnoseDocument(document, undefined, true);
                 diagnosticCollection.set(document.uri, diagnostics);
                 // 显示成功消息
                 vscode.window.showInformationMessage(
@@ -65,7 +65,7 @@ export function registerFixAllCommand(
             } else if (edits && edits.length === 0) {
                 logger.info('No formatting fixes return.');
                 // 无修复操作，直接诊断
-                const diagnostics = await diagnoseDocument(document);
+                const diagnostics = await diagnoseDocument(document, undefined, true);
                 diagnosticCollection.set(document.uri, diagnostics);
                 const hasDiagnostics = diagnostics.length > 0;
                 if (hasDiagnostics) {

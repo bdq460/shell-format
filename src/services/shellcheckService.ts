@@ -34,4 +34,21 @@ export class ShellcheckService {
             token,
         });
     }
+
+    /**
+     * 检查内容（用于未保存的文档）
+     * @param content 文件内容
+     * @param token 取消令牌
+     */
+    async checkContent(
+        content: string,
+        token?: CancellationToken,
+    ): Promise<ToolResult> {
+        return this.tool.check({
+            file: "",
+            commandArgs: ["-f", "gcc"],
+            token,
+            content,
+        });
+    }
 }

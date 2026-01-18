@@ -16,7 +16,7 @@ export async function execute(
     command: string,
     options: ExecutorOptions,
 ): Promise<ExecutionResult> {
-    const { args, token } = options;
+    const { args, token, stdin } = options;
     const fullCommand = `${command} ${args.join(" ")}`;
 
     return new Promise((resolve, reject) => {
@@ -31,6 +31,12 @@ export async function execute(
         const process = spawn(command, args);
         const stdout: Buffer[] = [];
         const stderr: Buffer[] = [];
+
+        // 如果提供了stdin内容，写入进程的标准输入
+        if (stdin) {
+            process.stdin.write(stdin);
+            process.stdin.end();
+        }
 
         // 清理进程资源的函数
         const cleanup = () => {

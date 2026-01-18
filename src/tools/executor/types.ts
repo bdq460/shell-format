@@ -27,6 +27,8 @@ export interface ExecutorOptions {
     args: string[];
     /** 取消令牌 */
     token?: CancellationToken;
+    /** 标准输入内容（可选，用于stdin模式） */
+    stdin?: string;
 }
 
 /**

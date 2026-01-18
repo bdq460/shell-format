@@ -39,10 +39,15 @@ export class ShfmtTool {
         fileName: string,
         options?: Partial<ShfmtCheckOptions>,
     ): Promise<ToolResult> {
-        const args = this.buildCheckArgs(options || {}).concat([fileName]);
+        const args = this.buildCheckArgs(options || {});
+        // 如果提供了content，使用stdin模式，添加'-'作为文件名占位符
+        const fileNameOrStdin = options?.content ? "-" : fileName;
+        args.push(fileNameOrStdin);
+
         const result = await execute(this.commandPath, {
             args: args,
             token: options?.token,
+            stdin: options?.content,
         });
 
         return parseShfmtOutput(result, "check");
@@ -114,4 +119,7 @@ export interface ShfmtFormatOptions {
 /**
  * shfmt 检查选项
  */
-export interface ShfmtCheckOptions extends ShfmtFormatOptions { }
+export interface ShfmtCheckOptions extends ShfmtFormatOptions {
+    /** 文件内容（可选，用于stdin模式） */
+    content?: string;
+}

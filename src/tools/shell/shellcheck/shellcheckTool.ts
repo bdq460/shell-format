@@ -13,6 +13,8 @@ export interface ShellcheckOptions {
     commandArgs?: string[];
     /** 取消令牌 */
     token?: CancellationToken;
+    /** 文件内容（可选，用于stdin模式） */
+    content?: string;
 }
 
 /**
@@ -30,12 +32,15 @@ export class ShellcheckTool {
      * 检查 Shell 脚本
      */
     async check(options: ShellcheckOptions): Promise<ToolResult> {
-        const args = (options.commandArgs || this.DefaultArges).concat(
-            options.file,
-        );
+        const args = [...(options.commandArgs || this.DefaultArges)];
+        // 如果提供了content，使用stdin模式，添加'-'作为文件名占位符
+        const fileNameOrStdin = options.content ? "-" : options.file;
+        args.push(fileNameOrStdin);
+
         const executeOptions = {
             args,
             token: options.token,
+            stdin: options.content,
         };
         const result = await execute(this.commandPath, executeOptions);
 
