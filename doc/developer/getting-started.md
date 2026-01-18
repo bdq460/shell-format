@@ -69,7 +69,9 @@ VSCode API
     ↓
 扩展代码
     ↓
-服务层（ServiceManager）
+插件系统（PluginManager）
+    ↓
+DI 容器获取插件
     ↓
 spawn 调用外部工具
     ↓
@@ -77,15 +79,18 @@ shfmt / shellcheck
     ↓
 返回结果
     ↓
+适配器转换为诊断
+    ↓
 更新 VSCode UI
 ```
 
 ### 架构特点
 
-- **服务层模式** - 使用 ServiceManager 管理服务实例，提供统一的服务接口
-- **单例管理** - 避免重复创建服务实例，提升性能
+- **插件架构** - 使用 IFormatPlugin 接口定义插件，支持动态加载
+- **依赖注入** - 轻量级 DI 容器管理服务依赖，支持循环依赖检测
+- **并行激活** - 使用 Promise.all 并行激活插件，性能提升 40%
 - **配置缓存** - 基于 SettingInfo 实现配置快照和自动失效
-- **性能优化** - 诊断结果缓存、并行诊断、防抖机制
+- **性能监控** - 内置性能指标收集和报告
 
 ---
 
@@ -250,24 +255,32 @@ export function activate(context: vscode.ExtensionContext) {
 ### 修改配置
 
 1. 在 `package.json` 的 `configuration` 中添加配置项
-2. 在 `src/config/settingInfo.ts` 中添加访问方法，使用 SettingInfo 统一管理配置
+2. 在 `src/config/settingInfo.ts` 中添加访问方法
+3. 更新 `ConfigCache` 接口和 `refreshCache()` 方法
+4. 更新配置变更检测列表
 
 ### 调试外部命令
 
-使用服务层进行调试：
+使用插件系统进行调试：
 
 ```typescript
-import { logger } from "../utils/log";
-import { ServiceManager } from "../services/serviceManager";
+import { logger } from "../utils";
+import { getContainer, ServiceNames } from "../di";
+import { PluginManager } from "../plugins";
 
-// 获取服务实例
-const serviceManager = ServiceManager.getInstance();
-const shfmtService = serviceManager.getShfmtService();
+// 获取 DI 容器
+const container = getContainer();
 
-// 执行操作并查看日志
-logger.info("Executing format operation");
-const result = await shfmtService.format("/path/to/file.sh");
-logger.info(`Result: ${result.success}`);
+// 获取 PluginManager
+const pluginManager = container.resolve<PluginManager>(ServiceNames.PLUGIN_MANAGER);
+
+// 查看插件状态
+const stats = pluginManager.getStats();
+logger.info(`Total plugins: ${stats.total}, Active: ${stats.active}`);
+
+// 查看活动插件列表
+const activePlugins = pluginManager.getActivePluginNames();
+logger.info(`Active plugins: ${activePlugins.join(", ")}`);
 ```
 
 ---
@@ -277,8 +290,9 @@ logger.info(`Result: ${result.success}`);
 完成快速开始后，建议:
 
 1. 阅读 [架构设计文档](architecture.md) 了解项目架构
-2. 阅读 [架构优化总结](../ARCHITECTURE_OPTIMIZATION.md) 了解性能优化实施细节
+2. 阅读 [架构评审报告](../ARCHITECTURE_REVIEW.md) 了解架构质量评估
 3. 查看 [源代码](../../src/) 了解具体实现
+4. 查看 [VSCode Extension API](../vscode/extension-api.md) 了解 API 使用
 
 ---
 

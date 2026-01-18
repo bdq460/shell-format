@@ -13,6 +13,7 @@ Shell Format automatically formats your Shell scripts and detects errors using i
 - **Error Detection 错误检测** - Detect syntax and semantic errors with shellcheck
 - **Automatic Diagnosis 自动诊断** - Automatic checking when opening, saving, or editing (300ms debounce/防抖)
 - **Quick Fixes 快速修复** - One-click fix for formatting issues
+- **Plugin System 插件系统** - Dynamic plugin activation/deactivation with configuration
 - **Detailed Logs 详细日志** - Timestamped operation logs with customizable format
 
 ## Configuration Options 配置选项
@@ -21,9 +22,15 @@ Shell Format automatically formats your Shell scripts and detects errors using i
 
 ```json
 {
-  "shell-format.shellcheckPath": "shellcheck",
-  "shell-format.shfmtPath": "shfmt",
   "shell-format.tabSize": 2,
+  "shell-format.plugins.shfmt": {
+    "enabled": true,
+    "path": "shfmt"
+  },
+  "shell-format.plugins.shellcheck": {
+    "enabled": true,
+    "path": "shellcheck"
+  },
   "shell-format.log": {
     "enabled": false,
     "level": "info",
@@ -35,19 +42,29 @@ Shell Format automatically formats your Shell scripts and detects errors using i
 
 ### Configuration Details 配置说明
 
-#### `shell-format.shellcheckPath`
+#### `shell-format.plugins.shfmt`
 
-Specifies the path to the shellcheck executable / 指定 shellcheck 可执行文件的路径
+Shfmt plugin configuration / Shfmt 插件配置
 
-- **Type 类型**: string
-- **Default 默认值**: `shellcheck`
+- **Type 类型**: object
+- **Default 默认值**: `{ "enabled": true, "path": "shfmt" }`
 
-#### `shell-format.shfmtPath`
+**Properties 属性**:
 
-Specifies the path to the shfmt executable / 指定 shfmt 可执行文件的路径
+- `enabled` (boolean): Enable or disable shfmt plugin / 是否启用 shfmt 插件 (default: `true`)
+- `path` (string): Path to shfmt executable / shfmt 可执行文件路径 (default: `"shfmt"`)
 
-- **Type 类型**: string
-- **Default 默认值**: `shfmt`
+#### `shell-format.plugins.shellcheck`
+
+Shellcheck plugin configuration / Shellcheck 插件配置
+
+- **Type 类型**: object
+- **Default 默认值**: `{ "enabled": true, "path": "shellcheck" }`
+
+**Properties 属性**:
+
+- `enabled` (boolean): Enable or disable shellcheck plugin / 是否启用 shellcheck 插件 (default: `true`)
+- `path` (string): Path to shellcheck executable / shellcheck 可执行文件路径 (default: `"shellcheck"`)
 
 #### `shell-format.tabSize`
 
@@ -94,10 +111,13 @@ Error handling method / 错误处理方式
 
 ## Plugin Commands 插件命令
 
-| Command                           | Description                                                     |
-| --------------------------------- | --------------------------------------------------------------- |
-| Format document with shell-format | Format entire document / 格式化整个文档                         |
-| Fix All Problems By Shellformat   | Fix all formatting issues with one click / 一键修复所有格式问题 |
+|| Command                                             | Description                                                            |
+|| --------------------------------------------------- | ---------------------------------------------------------------------- |
+|| shell-format.formatDocument                          | Format entire document / 格式化整个文档                                 |
+|| shell-format.fixAllProblems                          | Fix all formatting issues with one click / 一键修复所有格式问题               |
+|| shell-format.showPerformanceReport                    | Show performance metrics / 显示性能指标                                     |
+|| shell-format.resetPerformanceMetrics                  | Reset performance metrics / 重置性能指标                                   |
+|| shell-format.showPluginStatus                        | Show plugin status / 显示插件状态                                         |
 
 ## Usage 使用方法
 
@@ -155,6 +175,18 @@ Error handling method / 错误处理方式
   }
   ```
 
+### View Plugin Status 查看插件状态
+
+- Open Command Palette / 打开命令面板 (`Ctrl+Shift+P` / `Cmd+Shift+P`)
+- Enter "Shell Format: Show Plugin Status" / 输入"Shell Format: Show Plugin Status"
+- View all registered plugins, their versions, and activation status / 查看所有已注册的插件、版本和激活状态
+
+### View Performance Metrics 查看性能指标
+
+- Open Command Palette / 打开命令面板 (`Ctrl+Shift+P` / `Cmd+Shift+P`)
+- Enter "Shell Format: Show Performance Report" / 输入"Shell Format: Show Performance Report"
+- View detailed performance metrics including plugin activation time, execution time, etc. / 查看详细的性能指标，包括插件激活时间、执行时间等
+
 ## Formatting Example 格式化示例
 
 ### Before Formatting 格式化前
@@ -187,7 +219,7 @@ fi
 
 ### 为什么格式化选中文本时会格式化整个文档？
 
-A: Shell script formatting requires full context (like if/fi, do/done pairing), so even when text is selected, shfmt formats the entire document. VSCode automatically crops changes within the selection and applies them to the editor.
+A: Shell script formatting requires full context (like if/fi, do/done pairing), so even when text is selected, shfmt formats entire document. VSCode automatically crops changes within selection and applies them to editor.
 
 Shell 脚本格式化需要完整的上下文（如 if/fi、do/done 配对），因此即使只选中部分文本，shfmt 也会格式化整个文档。VSCode 会自动裁剪选中区域内的更改并应用到编辑器。
 
@@ -227,9 +259,9 @@ local unused_var="test"
 
 ### 此插件会影响 VSCode 性能吗？
 
-A: No. The plugin uses debouncing (300ms) to avoid frequent diagnostic triggers. All external commands are executed asynchronously and won't block the UI.
+A: No. The plugin uses debouncing (300ms) to avoid frequent diagnostic triggers. All external commands are executed asynchronously and won't block UI. Additionally, plugins can be enabled/disabled via configuration for fine-grained control.
 
-不会。插件使用防抖（300ms）来避免频繁触发诊断。所有外部命令都是异步执行的，不会阻塞 UI。
+不会。插件使用防抖（300ms）来避免频繁触发诊断。所有外部命令都是异步执行的，不会阻塞 UI。此外，可以通过配置启用/禁用插件以实现细粒度控制。
 
 ---
 
@@ -237,9 +269,42 @@ A: No. The plugin uses debouncing (300ms) to avoid frequent diagnostic triggers.
 
 ### 编辑时为什么不会立即显示错误？
 
-A: Diagnosis is performed on disk files, so changes in the editor need to be saved before being detected. Future versions will support real-time editing diagnosis via stdin.
+A: Diagnosis is performed on disk files, so changes in editor need to be saved before being detected. Future versions will support real-time editing diagnosis via stdin.
 
 诊断是基于磁盘文件进行的，编辑器中修改的内容需要保存后才能被检测。未来版本会支持通过 stdin 进行实时编辑时诊断。
+
+---
+
+### How to check which plugins are active?
+
+### 如何检查哪些插件处于活动状态？
+
+A: Use the "Shell Format: Show Plugin Status" command to view all registered plugins, their versions, and activation status.
+
+使用"Shell Format: Show Plugin Status"命令查看所有已注册的插件、版本和激活状态。
+
+---
+
+### How to disable a specific plugin?
+
+### 如何禁用特定插件？
+
+A: Configure the plugin's `enabled` property to `false` in settings.json:
+
+在 settings.json 中将插件的 `enabled` 属性设置为 `false`：
+
+```json
+{
+  "shell-format.plugins.shellcheck": {
+    "enabled": false,
+    "path": "shellcheck"
+  }
+}
+```
+
+This will disable shellcheck but keep shfmt enabled.
+
+这将禁用 shellcheck 但保持 shfmt 启用。
 
 ## System Requirements 系统要求
 
@@ -293,8 +358,8 @@ sudo apt-get install shellcheck
 go install github.com/koalaman/shellcheck/cmd/shellcheck@latest
 ```
 
-> Note: shellcheck is optional. If not installed, the plugin will only use shfmt for formatting and basic checking.
-> 注意：shellcheck 是可选的。如果未安装，插件将只使用 shfmt 进行格式化和基本检查。
+> Note: shellcheck is optional. If not installed or disabled, the plugin will only use shfmt for formatting and basic checking.
+> 注意：shellcheck 是可选的。如果未安装或被禁用，插件将只使用 shfmt 进行格式化和基本检查。
 
 ## Contact Developer 联系开发者
 
