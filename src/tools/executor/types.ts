@@ -9,7 +9,14 @@
  */
 export interface CancellationToken {
     readonly isCancellationRequested: boolean;
-    onCancellationRequested(callback: () => void): void;
+    onCancellationRequested(callback: () => void): Disposable | void;
+}
+
+/**
+ * 可释放对象接口
+ */
+export interface Disposable {
+    dispose(): void;
 }
 
 /**

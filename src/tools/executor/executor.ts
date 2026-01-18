@@ -20,24 +20,53 @@ export async function execute(
     const fullCommand = `${command} ${args.join(" ")}`;
 
     return new Promise((resolve, reject) => {
+        // 检查是否已请求取消
         if (token?.isCancellationRequested) {
             logger?.info(`Execute ${fullCommand} cancelled`);
             reject(new Error(`Execute ${fullCommand} cancelled`));
             return;
         }
 
+        // 创建子进程
         const process = spawn(command, args);
         const stdout: Buffer[] = [];
         const stderr: Buffer[] = [];
 
+        // 清理进程资源的函数
+        const cleanup = () => {
+            process.stdout.destroy();
+            process.stderr.destroy();
+            process.kill();
+        };
+
+        // 取消处理器：清理进程并拒绝Promise
+        const cancelHandler = () => {
+            logger?.info("Killing process due to cancellation");
+            cleanup();
+            reject(new Error(`Execute ${fullCommand} cancelled`));
+        };
+
+        // 订阅取消事件，返回Disposable对象或void
+        const disposable = token?.onCancellationRequested(cancelHandler);
+
+        // 确保在Promise完成后清理监听器，避免内存泄漏
+        const unsubscribe = () => {
+            if (disposable && typeof disposable.dispose === "function") {
+                disposable.dispose();
+            }
+        };
+
+        // 监听标准输出数据
         process.stdout.on("data", (chunk) => {
             stdout.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
         });
 
+        // 监听标准错误数据
         process.stderr.on("data", (chunk) => {
             stderr.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
         });
 
+        // 监听进程关闭事件
         process.on("close", (code) => {
             const stdoutStr = Buffer.concat(stdout).toString();
             const stderrStr = Buffer.concat(stderr).toString();
@@ -45,10 +74,9 @@ export async function execute(
                 `Execute ${fullCommand} completed with code: ${code}\nstdout: ${stdoutStr}\nstderr: ${stderrStr}`,
             );
 
-            // 记录 stdout 和 stderr（始终记录）
-            // logger?.debug?.(`stdout: ${stdoutStr}`);
-            // logger?.debug?.(`stderr: ${stderrStr}`);
-
+            // 清理监听器, 避免内存泄漏
+            unsubscribe();
+            // 返回执行结果
             resolve({
                 exitCode: code,
                 stdout: stdoutStr,
@@ -56,14 +84,12 @@ export async function execute(
             });
         });
 
+        // 监听进程错误事件
         process.on("error", (err) => {
             logger?.error(`Execution ${fullCommand} error: ${err.message}`);
+            // 清理监听器
+            unsubscribe();
             reject(new ToolExecutionError(err as NodeJS.ErrnoException, fullCommand));
-        });
-
-        token?.onCancellationRequested(() => {
-            logger?.info("Killing process due to cancellation");
-            process.kill();
         });
     });
 }
