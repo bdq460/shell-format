@@ -58,10 +58,8 @@ Shell Format 是一个 VSCode 扩展，提供 Shell 脚本的格式化和诊断�
 npm install
 
 # 打包插件
-## 方法1
+## 注意不要使用vsce package, 因为那样会导致未使用正确的README.md文件
 npm run package:extension
-## 方法2
-npx vsce package
 
 # 安装插件
 ##方法1

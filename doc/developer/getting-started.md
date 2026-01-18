@@ -149,6 +149,20 @@ npm test
 npm run lint
 ```
 
+### 5. 打包
+
+```bash
+npm run package:extension
+```
+
+### 6. 安装包
+
+```bash
+npm run install:extension
+```
+
+---
+
 ---
 
 ## 调试
