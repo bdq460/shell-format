@@ -12,8 +12,8 @@
 
 import { SettingInfo } from "../config";
 import { PluginManager } from "../plugins/pluginManager";
-import { PureShellcheckPlugin } from "../plugins/pureShellcheckPlugin";
-import { PureShfmtPlugin } from "../plugins/pureShfmtPlugin";
+import { PureShellcheckPlugin } from "../plugins/shellcheckPlugin";
+import { PureShfmtPlugin } from "../plugins/shfmtPlugin";
 import { logger } from "../utils/log";
 import { PerformanceMonitor } from "../utils/performance/monitor";
 import { DIContainer } from "./container";

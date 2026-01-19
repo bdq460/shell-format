@@ -15,8 +15,8 @@ import { SettingInfo } from "../config/settingInfo";
 import { getContainer, ServiceNames } from "../di";
 import { logger } from "../utils/log";
 import { PluginManager } from "./pluginManager";
-import { PureShellcheckPlugin } from "./pureShellcheckPlugin";
-import { PureShfmtPlugin } from "./pureShfmtPlugin";
+import { PureShellcheckPlugin } from "./shellcheckPlugin";
+import { PureShfmtPlugin } from "./shfmtPlugin";
 
 /**
  * 初始化和注册所有插件

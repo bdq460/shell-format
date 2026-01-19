@@ -5,7 +5,7 @@
  * 实现统一的插件接口
  */
 import * as vscode from "vscode";
-import { PackageInfo } from "../config/packageInfo";
+import { PackageInfo } from "../config";
 import { PERFORMANCE_METRICS } from "../metrics";
 import { ShellcheckTool } from "../tools/shell/shellcheck/shellcheckTool";
 import { logger } from "../utils";
@@ -31,13 +31,6 @@ export class PureShellcheckPlugin extends BaseFormatPlugin {
         logger.info(
             `PureShellcheckPlugin initialized with path: ${shellcheckPath}`,
         );
-    }
-
-    /**
-     * 获取插件的诊断源名称
-     */
-    getDiagnosticSource(): string {
-        return "shellcheck";
     }
 
     /**

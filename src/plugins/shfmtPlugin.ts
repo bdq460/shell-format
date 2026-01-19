@@ -6,8 +6,7 @@
  */
 
 import * as vscode from "vscode";
-import { SettingInfo } from "../config";
-import { PackageInfo } from "../config/packageInfo";
+import { PackageInfo, SettingInfo } from "../config";
 import { PERFORMANCE_METRICS } from "../metrics";
 import { ShfmtFormatOptions, ShfmtTool } from "../tools/shell/shfmt/shfmtTool";
 import { logger } from "../utils/log";
@@ -48,13 +47,6 @@ export class PureShfmtPlugin extends BaseFormatPlugin {
             caseIndent: true,
             spaceRedirects: true,
         };
-    }
-
-    /**
-     * 获取插件的诊断源名称
-     */
-    getDiagnosticSource(): string {
-        return "shfmt";
     }
 
     /**

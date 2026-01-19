@@ -28,6 +28,7 @@
 import * as vscode from "vscode";
 import { DiagnosticAdapter } from "../adapters/diagnosticAdapter";
 import { FormatterAdapter } from "../adapters/formatterAdapter";
+import { PackageInfo } from "../config";
 import { ToolCheckResult, ToolFormatResult } from "../tools/shell/types";
 import { logger } from "../utils/log";
 import { BasePlugin } from "../utils/plugin";
@@ -77,9 +78,11 @@ export abstract class BaseFormatPlugin
 
     /**
      * 获取插件的诊断源名称
-     * 用于在 VSCode 诊断面板中显示（如 "shfmt", "shellcheck"）
+     * 用于在 VSCode 诊断面板中显示
      */
-    abstract getDiagnosticSource(): string;
+    getDiagnosticSource(): string {
+        return PackageInfo.diagnosticSource;
+    }
 
     /**
      * 检查插件是否可用

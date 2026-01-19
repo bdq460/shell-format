@@ -8,5 +8,5 @@ export * from "./baseFormatPlugin";
 export * from "./pluginInitializer";
 export * from "./pluginInterface";
 export * from "./pluginManager";
-export * from "./pureShellcheckPlugin";
-export * from "./pureShfmtPlugin";
+export * from "./shellcheckPlugin";
+export * from "./shfmtPlugin";
