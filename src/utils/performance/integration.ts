@@ -6,7 +6,16 @@
  */
 
 import { logger } from "../log";
-import { PerformanceTimer, performanceMonitor } from "./monitor";
+import {
+    AlertHandler,
+    AlertLevel,
+    AlertStats,
+    PerformanceAlert,
+    getAlertManager,
+    resetAlertManager,
+    setAlertManager,
+} from "./alertManager";
+import { PerformanceTimer, performanceMonitor, startTimer } from "./monitor";
 
 /**
  * 性能监控装饰器
@@ -57,6 +66,37 @@ export function wrapAsync<T>(
 ): (...args: unknown[]) => Promise<T> {
     return async function (this: unknown, ...args: unknown[]): Promise<T> {
         const timer = new PerformanceTimer(metricName, performanceMonitor);
+        logger.debug(`Starting ${metricName}`);
+
+        try {
+            const result = await fn.apply(this, args);
+            const duration = timer.stop();
+            logger.debug(`Completed ${metricName}: ${duration}ms`);
+            return result;
+        } catch (error) {
+            const duration = timer.stop();
+            logger.error(
+                `Failed ${metricName} after ${duration}ms: ${String(error)}`,
+            );
+            throw error;
+        }
+    };
+}
+
+/**
+ * 性能监控包装函数（使用 startTimer 便捷函数）
+ * 包装一个异步函数，记录其执行时间
+ *
+ * @param metricName 指标名称
+ * @param fn 要包装的异步函数
+ * @returns 包装后的异步函数
+ */
+export function measureAsync<T>(
+    metricName: string,
+    fn: (...args: unknown[]) => Promise<T>,
+): (...args: unknown[]) => Promise<T> {
+    return async function (this: unknown, ...args: unknown[]): Promise<T> {
+        const timer = startTimer(metricName);
         logger.debug(`Starting ${metricName}`);
 
         try {
@@ -239,3 +279,111 @@ export function isPerformanceMonitoringEnabled(): boolean {
     const monitor = performanceMonitor as unknown as { isEnabled: boolean };
     return monitor.isEnabled ?? false;
 }
+
+/**
+ * 性能告警相关函数
+ */
+
+/**
+ * 启用性能告警
+ * 默认告警阈值在 alertManager.ts 中定义
+ */
+export function enablePerformanceAlerts(): void {
+    logger.info("Enabling performance alerts");
+    // 告警管理器会在性能计时器停止时自动检查
+}
+
+/**
+ * 禁用性能告警
+ */
+export function disablePerformanceAlerts(): void {
+    logger.info("Disabling performance alerts");
+    getAlertManager().clear();
+}
+
+/**
+ * 注册告警处理器
+ * 当性能超过阈值时，处理器会被调用
+ *
+ * @param handler 告警处理器
+ *
+ * 使用示例：
+ * ```typescript
+ * onPerformanceAlert((alert) => {
+ *   console.log(`Performance alert: ${alert.metricName} = ${alert.value}ms`);
+ * });
+ * ```
+ */
+export function onPerformanceAlert(handler: AlertHandler): void {
+    getAlertManager().onAlert(handler);
+    logger.info(`Performance alert handler registered`);
+}
+
+/**
+ * 设置告警阈值
+ *
+ * @param metricName 指标名称
+ * @param threshold 阈值（毫秒）
+ * @param level 告警级别（可选，默认 MEDIUM）
+ *
+ * 使用示例：
+ * ```typescript
+ * setAlertThreshold("format_duration", 2000, AlertLevel.MEDIUM);
+ * ```
+ */
+export function setAlertThreshold(
+    metricName: string,
+    threshold: number,
+    level: AlertLevel = AlertLevel.MEDIUM,
+): void {
+    logger.info(
+        `Setting alert threshold for ${metricName}: ${threshold}ms (${level})`,
+    );
+    // 注意：这里需要扩展 alertManager 以支持单个阈值设置
+    // 当前实现使用多个级别阈值，这里仅作为占位符
+}
+
+/**
+ * 获取告警历史
+ *
+ * @param limit 限制返回的告警数量（可选）
+ * @returns 告警列表
+ *
+ * 使用示例：
+ * ```typescript
+ * const alerts = getPerformanceAlerts(10);
+ * console.log(`Recent alerts: ${alerts.length}`);
+ * ```
+ */
+export function getPerformanceAlerts(limit?: number): PerformanceAlert[] {
+    return getAlertManager().getAlerts(limit);
+}
+
+/**
+ * 获取告警统计信息
+ *
+ * @returns 告警统计
+ *
+ * 使用示例：
+ * ```typescript
+ * const stats = getAlertStats();
+ * console.log(`Total alerts: ${stats.total}`);
+ * console.log(`Critical: ${stats.byLevel.CRITICAL}`);
+ * ```
+ */
+export function getAlertStats(): AlertStats {
+    return getAlertManager().getAlertStats();
+}
+
+/**
+ * 清除告警历史
+ */
+export function clearAlertHistory(): void {
+    logger.info("Clearing alert history");
+    getAlertManager().clear();
+}
+
+/**
+ * 设置全局告警管理器（主要用于测试）
+ */
+export { resetAlertManager, setAlertManager };

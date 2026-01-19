@@ -65,7 +65,7 @@ export class DIContainer {
      * @returns Promise，在所有清理操作完成后 resolve
      */
 
-    private services = new Map<string, ServiceMetadata<unknown>>();
+    private services = new Map<string, ServiceMetadata<any>>();
     private creatingStack = new Set<string>();
 
     /**

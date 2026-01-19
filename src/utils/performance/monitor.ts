@@ -3,6 +3,8 @@
  * 提供性能指标收集和统计功能
  */
 
+import { getAlertManager } from "./alertManager";
+
 /**
  * 性能指标数据
  */
@@ -210,6 +212,8 @@ export class PerformanceTimer {
     stop(): number {
         const duration = Date.now() - this.startTime;
         this.monitor.recordMetric(this.name, duration);
+        // 触发告警检查
+        getAlertManager().check(this.name, duration);
         return duration;
     }
 
@@ -220,6 +224,8 @@ export class PerformanceTimer {
     async stopAsync(): Promise<number> {
         const duration = Date.now() - this.startTime;
         this.monitor.recordMetric(this.name, duration);
+        // 触发告警检查
+        getAlertManager().check(this.name, duration);
         return duration;
     }
 }

@@ -775,42 +775,55 @@ export class SettingInfo {
 
 **职责**：
 
-- 收集性能指标
-- 支持性能报告和重置
+- 收集和统计性能指标
+- 提供性能告警功能
+- 生成性能报告
 
-**核心设计**：
+**核心组件**：
+
+1. **PerformanceMonitor** - 单例，收集性能指标（count、min、max、avg）
+2. **PerformanceTimer** - 便捷的计时工具，支持同步和异步
+3. **PerformanceAlertManager** - 告警管理，支持多级别阈值配置（LOW、MEDIUM、HIGH、CRITICAL）
+
+**关键用法**：
 
 ```typescript
-export class PerformanceMonitor {
-  private static instance: PerformanceMonitor;
-
-  private metrics = new Map<string, PerformanceMetric>();
-
-  record(name: string, duration: number): void {
-    const metric = this.metrics.get(name) || {
-      count: 0,
-      totalDuration: 0,
-      minDuration: Infinity,
-      maxDuration: 0,
-    };
-
-    metric.count++;
-    metric.totalDuration += duration;
-    metric.minDuration = Math.min(metric.minDuration, duration);
-    metric.maxDuration = Math.max(metric.maxDuration, duration);
-
-    this.metrics.set(name, metric);
-  }
-
-  getReport(): string {
-    // 生成性能报告
-  }
-
-  reset(): void {
-    this.metrics.clear();
-  }
+// 使用 Timer 记录操作耗时
+const timer = startTimer("format-document");
+try {
+  await formatDocument(document);
+} finally {
+  timer.stop(); // 自动记录指标和检查告警
 }
+
+// 配置告警阈值
+const alertManager = getAlertManager();
+alertManager.configureThreshold({
+  metricName: "shfmt-format",
+  highThreshold: 1000,
+  criticalThreshold: 5000,
+});
+
+// 注册告警处理器
+alertManager.onAlert((alert) => {
+  if (alert.level === AlertLevel.CRITICAL) {
+    logger.error(`Critical: ${alert.message}`);
+  }
+});
+
+// 生成性能报告
+const monitor = PerformanceMonitor.getInstance();
+const report = monitor.generateReport();
 ```
+
+**监控的关键指标**：
+
+- `shfmt-format` - Shfmt 格式化耗时
+- `shellcheck-check` - Shellcheck 检查耗时
+- `format-document` - 总格式化耗时
+- `diagnose-document` - 总诊断耗时
+
+> 详见 [monitor.md](./monitor.md) 了解完整实现细节
 
 ## 关键设计模式
 

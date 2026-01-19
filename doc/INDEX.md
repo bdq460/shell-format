@@ -17,6 +17,7 @@
 - [package.json 配置说明](vscode/package-json.md) - 扩展配置详解
 - [language-configuration.json 详解](vscode/language-configuration.md) - 语言配置说明
 - [plugin.md](developer/plugin.md) - 插件机制完整指南
+- [monitor.md](developer/monitor.md) - 性能监控指南
 
 ### 🔧 工具参考
 

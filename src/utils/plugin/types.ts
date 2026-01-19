@@ -40,15 +40,21 @@ export interface Message<T = any> {
 /**
  * 消息处理器
  * @param T 载荷类型
+ *
+ * 设计原则：
+ * - 泛型 T 确保 Message 载荷类型完整
+ * - 返回类型明确：void | Promise<void>（不使用 any）
+ * - 处理器可同步或异步，类型系统清晰反映
  */
 export type MessageHandler<T = any> = (
-    message: Message<T>,
-) => void | Promise<void>;
+    message: Message<T>, // Message 的载荷类型与 T 一致
+) => void | Promise<void>; // 明确的返回类型
 
 /**
  * 消息订阅配置
+ * @template T 载荷类型
  */
-export interface MessageSubscriptionOptions {
+export interface MessageSubscriptionOptions<T = any> {
     /** 是否只订阅一次 */
     once?: boolean;
 
@@ -56,16 +62,17 @@ export interface MessageSubscriptionOptions {
     priority?: number;
 
     /** 过滤器函数（返回 true 才处理此消息） */
-    filter?: (message: Message) => boolean;
+    filter?: (message: Message<T>) => boolean;
 
     /** 错误处理器 */
-    errorHandler?: (error: Error, message: Message) => void;
+    errorHandler?: (error: Error, message: Message<T>) => void;
 }
 
 /**
  * 消息订阅信息
+ * @template T 载荷类型
  */
-export interface MessageSubscription {
+export interface MessageSubscription<T = any> {
     /** 订阅 ID */
     id: string;
 
@@ -73,10 +80,10 @@ export interface MessageSubscription {
     type: MessageType;
 
     /** 处理器 */
-    handler: MessageHandler;
+    handler: MessageHandler<T>;
 
     /** 订阅选项 */
-    options: MessageSubscriptionOptions;
+    options: MessageSubscriptionOptions<T>;
 }
 
 /**
