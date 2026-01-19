@@ -9,11 +9,11 @@ import * as vscode from "vscode";
 import { PERFORMANCE_METRICS } from "../metrics";
 import { logger, startTimer } from "../utils";
 import {
-    CheckOptions,
-    CheckResult,
-    FormatOptions,
-    FormatResult,
     IFormatPlugin,
+    PluginCheckOptions,
+    PluginCheckResult,
+    PluginFormatOptions,
+    PluginFormatResult,
 } from "./pluginInterface";
 
 /**
@@ -140,8 +140,8 @@ export class PluginManager {
      */
     async format(
         document: vscode.TextDocument,
-        options: FormatOptions,
-    ): Promise<FormatResult> {
+        options: PluginFormatOptions,
+    ): Promise<PluginFormatResult> {
         const timer = startTimer(
             PERFORMANCE_METRICS.PLUGIN_EXECUTE_FORMAT_DURATION,
         );
@@ -155,7 +155,6 @@ export class PluginManager {
             return {
                 hasErrors: true,
                 diagnostics: [],
-                errorMessage: "No active plugins available",
                 textEdits: [],
             };
         }
@@ -186,16 +185,6 @@ export class PluginManager {
                     // 检查是否有错误
                     if (result.hasErrors) {
                         hasErrors = true;
-                        if (result.errorMessage) {
-                            errors.push(`Plugin "${name}": ${result.errorMessage}`);
-                            // 将 errorMessage 转化为 diagnostic
-                            const errorDiagnostic = this.createErrorDiagnostic(
-                                result.errorMessage,
-                                document,
-                                name,
-                            );
-                            allDiagnostics.push(errorDiagnostic);
-                        }
                     }
 
                     // 如果有文本编辑，返回结果
@@ -207,7 +196,6 @@ export class PluginManager {
                         return {
                             hasErrors,
                             diagnostics: allDiagnostics,
-                            errorMessage: hasErrors ? errors.join("; ") : undefined,
                             textEdits: result.textEdits,
                         };
                     } else {
@@ -239,10 +227,6 @@ export class PluginManager {
         return {
             hasErrors,
             diagnostics: allDiagnostics,
-            errorMessage:
-                errors.length > 0
-                    ? "Format failed with error. Check the Problems panel."
-                    : undefined,
             textEdits: [],
         };
     }
@@ -255,8 +239,8 @@ export class PluginManager {
      */
     async check(
         document: vscode.TextDocument,
-        options: CheckOptions,
-    ): Promise<CheckResult> {
+        options: PluginCheckOptions,
+    ): Promise<PluginCheckResult> {
         const timer = startTimer(PERFORMANCE_METRICS.PLUGIN_EXECUTE_CHECK_DURATION);
         logger.info(
             `Checking document: ${document.fileName} with ${this.activePlugins.size} active plugins`,
@@ -268,7 +252,6 @@ export class PluginManager {
             return {
                 hasErrors: false,
                 diagnostics: [],
-                errorMessage: "No active plugins available for checking",
             };
         }
 
@@ -293,20 +276,6 @@ export class PluginManager {
 
                     if (result.hasErrors) {
                         hasErrors = true;
-                    }
-
-                    if (result.errorMessage) {
-                        logger.error(
-                            `Plugin "${name}" check error: ${result.errorMessage}`,
-                        );
-                        errors.push(`Plugin "${name}": ${result.errorMessage}`);
-                        // 将 errorMessage 转化为 diagnostic
-                        const errorDiagnostic = this.createErrorDiagnostic(
-                            result.errorMessage,
-                            document,
-                            name,
-                        );
-                        allDiagnostics.push(errorDiagnostic);
                     }
                 } catch (error) {
                     const msg = `Plugin "${name}" check failed: ${String(error)}`;
@@ -335,10 +304,6 @@ export class PluginManager {
         return {
             hasErrors,
             diagnostics: allDiagnostics,
-            errorMessage:
-                errors.length > 0
-                    ? "Checking failed with error. Check the Problems panel."
-                    : undefined,
         };
     }
 

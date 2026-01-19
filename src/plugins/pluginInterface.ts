@@ -11,7 +11,7 @@ import { CancellationToken } from "../tools/executor/types";
 /**
  * 通用格式化选项
  */
-export interface CommondOptions {
+export interface PluginCommondOptions {
     /** 取消令牌 */
     token?: CancellationToken;
     /** 超时时间（毫秒） */
@@ -22,39 +22,30 @@ export interface CommondOptions {
  * 通用格式化选项（兼容性别名）
  * 使用插件特定的参数接口
  */
-export interface FormatOptions extends CommondOptions {
-    /** 检查模式（格式检查或静态分析） */
-    mode?: "format" | "lint";
-}
+export interface PluginFormatOptions extends PluginCommondOptions { }
 
 /**
  * 通用检查选项（兼容性别名）
  * 使用插件特定的参数接口
  */
-export interface CheckOptions extends CommondOptions {
-    /** 检查模式（格式检查或静态分析） */
-    mode?: "format" | "lint";
+export interface PluginCheckOptions extends PluginCommondOptions { }
+
+export interface PluginCommonResult {
+    /** 是否有错误 */
+    hasErrors: boolean;
+    /** 诊断信息, 执行过程中的错误信息 */
+    diagnostics: Diagnostic[];
 }
 
 /**
  * 检查结果
  */
-export interface CheckResult {
-    /** 是否有错误 */
-    hasErrors: boolean;
-    /** 诊断信息 */
-    diagnostics: Diagnostic[];
-    /** 错误信息（如果有） */
-    errorMessage?: string;
-}
+export interface PluginCheckResult extends PluginCommonResult { }
 
-export interface FormatResult {
-    /** 是否有错误 */
-    hasErrors: boolean;
-    /** 诊断信息 */
-    diagnostics: Diagnostic[];
-    /** 错误信息（如果有） */
-    errorMessage?: string;
+/**
+ * 格式化结果
+ */
+export interface PluginFormatResult extends PluginCommonResult {
     /** 格式化编辑列表, 如果为空, 表示没有格式变化 */
     textEdits: TextEdit[];
 }
@@ -97,8 +88,8 @@ export interface IFormatPlugin {
      */
     format?(
         document: TextDocument,
-        options: FormatOptions,
-    ): Promise<FormatResult>;
+        options: PluginFormatOptions,
+    ): Promise<PluginFormatResult>;
 
     /**
      * 检查内容
@@ -106,7 +97,10 @@ export interface IFormatPlugin {
      * @param options 检查选项
      * @returns 检查结果
      */
-    check(document: TextDocument, options: CheckOptions): Promise<CheckResult>;
+    check(
+        document: TextDocument,
+        options: PluginCheckOptions,
+    ): Promise<PluginCheckResult>;
 
     /**
      * 获取插件支持的文件扩展名

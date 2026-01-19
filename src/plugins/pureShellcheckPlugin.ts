@@ -5,14 +5,13 @@
  * 实现统一的插件接口
  */
 import * as vscode from "vscode";
-import { DiagnosticAdapter } from "../adapters/diagnosticAdapter";
 import { PackageInfo } from "../config/packageInfo";
 import { PERFORMANCE_METRICS } from "../metrics";
 import { ShellcheckTool } from "../tools/shell/shellcheck/shellcheckTool";
 import { logger } from "../utils";
 import { startTimer } from "../utils/performance/monitor";
 import { BaseFormatPlugin } from "./baseFormatPlugin";
-import { CheckOptions, CheckResult } from "./pluginInterface";
+import { PluginCheckOptions, PluginCheckResult } from "./pluginInterface";
 
 /**
  * shellcheck 纯插件
@@ -59,8 +58,8 @@ export class PureShellcheckPlugin extends BaseFormatPlugin {
      */
     async check(
         document: vscode.TextDocument,
-        options: CheckOptions,
-    ): Promise<CheckResult> {
+        options: PluginCheckOptions,
+    ): Promise<PluginCheckResult> {
         logger.debug(
             `PureShellcheckPlugin.check called with options: ${JSON.stringify(options)}`,
         );
@@ -79,8 +78,7 @@ export class PureShellcheckPlugin extends BaseFormatPlugin {
             return this.createCheckResult(
                 result,
                 document,
-                PackageInfo.diagnosticSource,
-                DiagnosticAdapter.convert,
+                this.getDiagnosticSource(),
             );
         } catch (error) {
             timer.stop();

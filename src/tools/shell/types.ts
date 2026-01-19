@@ -13,11 +13,21 @@ export interface ToolResult {
     executeErrors?: ExecuteError[];
 }
 
-export interface CheckResult extends ToolResult { }
+export interface ToolCheckResult extends ToolResult { }
 
-export interface FormatResult extends ToolResult {
+export interface ToolFormatResult extends ToolResult {
     formattedContent?: string;
 }
+
+/**
+ * @deprecated 使用 ToolCheckResult 替代
+ */
+export type CheckResult = ToolCheckResult;
+
+/**
+ * @deprecated 使用 ToolFormatResult 替代
+ */
+export type FormatResult = ToolFormatResult;
 
 /**
  * 语法错误: 语法错，跑不了

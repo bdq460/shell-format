@@ -100,7 +100,7 @@ export async function activate(context: vscode.ExtensionContext) {
                     logger.info(
                         `Note: Shell script formatting requires full document context, will format entire document`,
                     );
-                    return formatDocument(document, options, token, true);
+                    return formatDocument(document, options, token);
                 },
             },
         );
@@ -206,11 +206,7 @@ export async function activate(context: vscode.ExtensionContext) {
             uri,
             async () => {
                 try {
-                    const diagnostics = await diagnoseDocument(
-                        event.document,
-                        undefined,
-                        true,
-                    );
+                    const diagnostics = await diagnoseDocument(event.document, undefined);
                     diagnosticCollection.set(event.document.uri, diagnostics);
                 } catch (error) {
                     logger.error(

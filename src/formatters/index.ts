@@ -14,16 +14,19 @@ import { PERFORMANCE_METRICS } from "../metrics";
 import { PluginManager } from "../plugins";
 import { logger, startTimer } from "../utils";
 
-// ==================== 格式化执行层 ====================
-
 /**
- * 执行格式化（使用纯插件方案）
+ * 格式化文档
  * @param document 文档对象
+ * @param _options 格式化选项（未使用，由插件内部处理）
  * @param token 取消令牌
+ * @param preferContentMode 是否优先使用content模式（未使用，纯插件方案总是使用content模式）
  * @returns TextEdit 数组
+ *
+ * 使用插件格式化文档, 并返回格式化后的内容
  */
-async function runFormat(
+export async function formatDocument(
     document: vscode.TextDocument,
+    _options?: vscode.FormattingOptions,
     token?: vscode.CancellationToken,
 ): Promise<vscode.TextEdit[]> {
     logger.info(`Start format document: ${document.fileName}`);
@@ -46,12 +49,8 @@ async function runFormat(
         if (result.diagnostics && result.diagnostics.length > 0) {
             // 如果有诊断信息（如语法错误），记录到日志
             logger.debug(
-                `Format returned ${result.diagnostics.length} diagnostics: ${result.diagnostics.map(d => d.message).join("; ")}`,
+                `Format returned ${result.diagnostics.length} diagnostics: ${result.diagnostics.map((d) => d.message).join("; ")}`,
             );
-        }
-
-        if (result.errorMessage) {
-            logger.warn(`Format error: ${result.errorMessage}`);
         }
 
         logger.debug(`Format returned ${result.textEdits.length} edits`);
@@ -61,26 +60,4 @@ async function runFormat(
         logger.error(`Format failed: ${String(error)}`);
         return [];
     }
-}
-
-// ==================== 对外 API 层 ====================
-
-/**
- * 格式化文档
- * @param document 文档对象
- * @param _options 格式化选项（未使用，由插件内部处理）
- * @param token 取消令牌
- * @param preferContentMode 是否优先使用content模式（未使用，纯插件方案总是使用content模式）
- * @returns TextEdit 数组
- *
- * 使用插件格式化文档, 并返回格式化后的内容
- */
-export async function formatDocument(
-    document: vscode.TextDocument,
-    _options?: vscode.FormattingOptions,
-    token?: vscode.CancellationToken,
-    preferContentMode = false,
-): Promise<vscode.TextEdit[]> {
-    // 纯插件方案统一使用 content 模式
-    return await runFormat(document, token);
 }

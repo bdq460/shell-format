@@ -6,8 +6,6 @@
  */
 
 import * as vscode from "vscode";
-import { DiagnosticAdapter } from "../adapters/diagnosticAdapter";
-import { FormatterAdapter } from "../adapters/formatterAdapter";
 import { SettingInfo } from "../config";
 import { PackageInfo } from "../config/packageInfo";
 import { PERFORMANCE_METRICS } from "../metrics";
@@ -16,10 +14,10 @@ import { logger } from "../utils/log";
 import { startTimer } from "../utils/performance/monitor";
 import { BaseFormatPlugin } from "./baseFormatPlugin";
 import {
-    CheckOptions,
-    CheckResult,
-    FormatOptions,
-    FormatResult,
+    PluginCheckOptions,
+    PluginCheckResult,
+    PluginFormatOptions,
+    PluginFormatResult,
 } from "./pluginInterface";
 
 /**
@@ -80,8 +78,8 @@ export class PureShfmtPlugin extends BaseFormatPlugin {
      */
     async format(
         document: vscode.TextDocument,
-        options: FormatOptions,
-    ): Promise<FormatResult> {
+        options: PluginFormatOptions,
+    ): Promise<PluginFormatResult> {
         logger.debug(
             `PureShfmtPlugin.format called with options: ${JSON.stringify(options)}`,
         );
@@ -100,8 +98,7 @@ export class PureShfmtPlugin extends BaseFormatPlugin {
             return this.createFormatResult(
                 result,
                 document,
-                PackageInfo.diagnosticSource,
-                FormatterAdapter.convert,
+                this.getDiagnosticSource(),
             );
         } catch (error) {
             timer.stop();
@@ -115,8 +112,8 @@ export class PureShfmtPlugin extends BaseFormatPlugin {
      */
     async check(
         document: vscode.TextDocument,
-        options: CheckOptions,
-    ): Promise<CheckResult> {
+        options: PluginCheckOptions,
+    ): Promise<PluginCheckResult> {
         logger.debug(
             `PureShfmtPlugin.check called with options: ${JSON.stringify(options)}`,
         );
@@ -134,8 +131,7 @@ export class PureShfmtPlugin extends BaseFormatPlugin {
             return this.createCheckResult(
                 result,
                 document,
-                PackageInfo.diagnosticSource,
-                DiagnosticAdapter.convert,
+                this.getDiagnosticSource(),
             );
         } catch (error) {
             timer.stop();
