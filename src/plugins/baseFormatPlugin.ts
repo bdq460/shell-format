@@ -2,7 +2,8 @@
  * 基础格式化插件抽象类
  *
  * 职责：
- * - 定义所有格式化插件的通用接口和行为
+ * - 继承通用插件机制 (BasePlugin)
+ * - 添加 VSCode 特定的格式化和检查功能
  * - 提供统一的异常处理和错误转换机制
  * - 简化子类的实现，避免重复的 try-catch 和错误处理代码
  *
@@ -18,9 +19,10 @@
  * - 诊断生成：统一通过 DiagnosticFactory 确保一致性
  *
  * 继承关系：
- * BaseFormatPlugin (本类)
- *   ├── PureShfmtPlugin
- *   └── PureShellcheckPlugin
+ * BasePlugin (通用插件机制)
+ *   └── BaseFormatPlugin (VSCode 特定)
+ *         ├── PureShfmtPlugin
+ *         └── PureShellcheckPlugin
  */
 
 import * as vscode from "vscode";
@@ -28,6 +30,7 @@ import { DiagnosticAdapter } from "../adapters/diagnosticAdapter";
 import { FormatterAdapter } from "../adapters/formatterAdapter";
 import { ToolCheckResult, ToolFormatResult } from "../tools/shell/types";
 import { logger } from "../utils/log";
+import { BasePlugin } from "../utils/plugin";
 import {
     IFormatPlugin,
     PluginCheckResult,
@@ -64,38 +67,19 @@ function createErrorDiagnostic(
 
 /**
  * 基础格式化插件抽象类
- * 所有格式化插件的基类，提供通用的功能和异常处理机制
+ *
+ * 继承 BasePlugin（通用插件机制），添加 VSCode 特定的格式化和检查功能
  */
-export abstract class BaseFormatPlugin implements IFormatPlugin {
+export abstract class BaseFormatPlugin
+    extends BasePlugin
+    implements IFormatPlugin {
+    protected configChangeSubId?: string;
+
     /**
      * 获取插件的诊断源名称
      * 用于在 VSCode 诊断面板中显示（如 "shfmt", "shellcheck"）
      */
     abstract getDiagnosticSource(): string;
-
-    /**
-     * 获取插件名称（唯一标识符）
-     * 用于插件管理和日志记录
-     */
-    abstract get name(): string;
-
-    /**
-     * 获取插件显示名称
-     * 用于 UI 展示（用户友好的名称）
-     */
-    abstract get displayName(): string;
-
-    /**
-     * 获取插件版本
-     * 用于诊断和日志追踪
-     */
-    abstract get version(): string;
-
-    /**
-     * 获取插件描述
-     * 用于 UI 帮助和文档
-     */
-    abstract get description(): string;
 
     /**
      * 检查插件是否可用
@@ -108,6 +92,27 @@ export abstract class BaseFormatPlugin implements IFormatPlugin {
      * 用于过滤哪些文件应该被此插件处理
      */
     abstract getSupportedExtensions(): string[];
+
+    /**
+     * 获取插件依赖
+     * 格式化插件默认没有依赖
+     */
+    getDependencies() {
+        return [];
+    }
+
+    /**
+     * 获取插件能力
+     * 返回此插件提供的能力
+     */
+    getCapabilities(): string[] {
+        const extensions = this.getSupportedExtensions();
+        return [
+            `format:${this.name}`,
+            `check:${this.name}`,
+            `extensions:${extensions.join(",")}`,
+        ];
+    }
 
     /**
      * 检查文档（子类实现）

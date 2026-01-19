@@ -32,7 +32,6 @@ export class PureShfmtPlugin extends BaseFormatPlugin {
     private tool: ShfmtTool;
     private defaultShfmtOptions: ShfmtFormatOptions;
     private watcher?: vscode.FileSystemWatcher;
-
     constructor(shfmtPath: string, indent: number | undefined) {
         super();
         this.tool = new ShfmtTool(shfmtPath);
@@ -150,25 +149,43 @@ export class PureShfmtPlugin extends BaseFormatPlugin {
 
     /**
      * 插件激活时的钩子
-     * 示例：创建文件系统监视器
+     * 示例：订阅配置变更消息
      */
     async onActivate(): Promise<void> {
         logger.info(`${this.name} plugin activated`);
 
-        // 示例：创建文件监视器（如果需要监视文件变化）
-        // this.watcher = vscode.workspace.createFileSystemWatcher('**/*.sh');
-        // this.watcher.onDidChange((uri) => {
-        //     logger.debug(`File changed: ${uri.fsPath}`);
-        //     // 处理文件变化逻辑
-        // });
+        // 订阅配置变更消息
+        if (this.messageBus) {
+            this.configChangeSubId = this.messageBus.subscribe(
+                "config:change",
+                (msg: any) => {
+                    logger.debug(`${this.name} received config:change message`);
+                    // 处理配置变更
+                    if (msg.payload?.indent !== undefined) {
+                        this.defaultShfmtOptions = this.buildDefaultShfmtOptions();
+                        logger.debug(
+                            `${this.name} reloaded default options with new indent`,
+                        );
+                    }
+                },
+            );
+            logger.debug(`${this.name} subscribed to config:change messages`);
+        }
     }
 
     /**
      * 插件停用时的钩子
-     * 示例：清理文件系统监视器
+     * 不仅清理文件系统监视器，也需要取消消息订阅
      */
     async onDeactivate(): Promise<void> {
         logger.info(`${this.name} plugin deactivated`);
+
+        // 取消配置变更消息订阅
+        if (this.messageBus && this.configChangeSubId) {
+            this.messageBus.unsubscribe(this.configChangeSubId);
+            this.configChangeSubId = undefined;
+            logger.debug(`${this.name} unsubscribed from config:change messages`);
+        }
 
         // 清理资源
         if (this.watcher) {
@@ -178,16 +195,13 @@ export class PureShfmtPlugin extends BaseFormatPlugin {
     }
 
     /**
-     * 配置变更时的钩子
-     * 示例：重新加载配置
+     * 获取插件依赖
+     * shfmt 不依赖于其他插件
      */
-    async onConfigChange(config: any): Promise<void> {
-        logger.info(`${this.name} config changed: ${JSON.stringify(config)}`);
-
-        // 示例：重新加载配置
-        if (config.indent !== undefined) {
-            this.defaultShfmtOptions = this.buildDefaultShfmtOptions();
-            logger.debug(`Reloaded default options with indent: ${this.defaultShfmtOptions.indent}`);
-        }
+    getDependencies() {
+        return [
+            // 示例：如果 shfmt 需要 shellcheck 来检验，可以这样声明
+            // { name: 'shellcheck', required: false }
+        ];
     }
 }

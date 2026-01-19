@@ -4,7 +4,10 @@
 
 Shell Format 是一个基于 VSCode 扩展 API 的 Shell 脚本格式化和诊断工具。本文档详细说明项目的架构设计、技术选型和实现细节。
 
-> **注意**：本文档专注于项目架构设计。关于 VSCode Extension API 的详细说明，请参考 [extension-api.md](../vscode/extension-api.md)。
+> **注意**：本文档专注于项目整体架构设计。
+>
+> - 关于 **插件机制详解**，请参考 [plugin.md](./plugin.md)
+> - 关于 VSCode Extension API 的详细说明，请参考 [extension-api.md](../vscode/extension-api.md)
 
 ## 核心概念
 
@@ -21,14 +24,14 @@ Shell Format 采用插件架构，所有格式化和诊断功能都通过插件�
 
 ```typescript
 export interface IFormatPlugin {
-    name: string;
-    displayName: string;
-    version: string;
-    description: string;
-    isAvailable(): Promise<boolean>;
-    format(document: TextDocument, options: FormatOptions): Promise<TextEdit[]>;
-    check(document: TextDocument, options: CheckOptions): Promise<CheckResult>;
-    getSupportedExtensions(): string[];
+  name: string;
+  displayName: string;
+  version: string;
+  description: string;
+  isAvailable(): Promise<boolean>;
+  format(document: TextDocument, options: FormatOptions): Promise<TextEdit[]>;
+  check(document: TextDocument, options: CheckOptions): Promise<CheckResult>;
+  getSupportedExtensions(): string[];
 }
 ```
 
@@ -45,13 +48,21 @@ export interface IFormatPlugin {
 
 ```typescript
 class DIContainer {
-    registerSingleton<T>(name: string, factory: ServiceFactory<T>, dependencies: string[]): void;
-    registerTransient<T>(name: string, factory: ServiceFactory<T>, dependencies: string[]): void;
-    resolve<T>(name: string): T;
-    has(name: string): boolean;
-    reset(): void;
-    clear(): void;
-    async cleanup(): Promise<void>;
+  registerSingleton<T>(
+    name: string,
+    factory: ServiceFactory<T>,
+    dependencies: string[],
+  ): void;
+  registerTransient<T>(
+    name: string,
+    factory: ServiceFactory<T>,
+    dependencies: string[],
+  ): void;
+  resolve<T>(name: string): T;
+  has(name: string): boolean;
+  reset(): void;
+  clear(): void;
+  async cleanup(): Promise<void>;
 }
 ```
 
@@ -65,22 +76,22 @@ class DIContainer {
 
 **跳过模式**：
 
-| 模式        | 说明               | 示例                |
-| ------------ | ------------------ | ------------------- |
-| `/\.git$/`  | Git 冲突文件      | `example.sh.git`     |
-| `/\.swp$/`  | Vim 临时文件       | `file.sh.swp`        |
-| `/\.swo$/`  | Vim 交换文件       | `file.sh.swo`        |
-| `/~$/`       | 备份文件           | `file.sh~`           |
-| `/\.tmp$/`  | 临时文件           | `file.sh.tmp`        |
-| `/\.bak$/`  | 备份文件           | `file.sh.bak`        |
+| 模式       | 说明         | 示例             |
+| ---------- | ------------ | ---------------- |
+| `/\.git$/` | Git 冲突文件 | `example.sh.git` |
+| `/\.swp$/` | Vim 临时文件 | `file.sh.swp`    |
+| `/\.swo$/` | Vim 交换文件 | `file.sh.swo`    |
+| `/~$/`     | 备份文件     | `file.sh~`       |
+| `/\.tmp$/` | 临时文件     | `file.sh.tmp`    |
+| `/\.bak$/` | 备份文件     | `file.sh.bak`    |
 
 **示例代码**：
 
 ```typescript
 function shouldSkipFile(fileName: string): boolean {
-    const baseName = path.basename(fileName);
-    const skipPatterns = [/\.git$/, /\.swp$/, /\.swo$/, /~$/, /\.tmp$/, /\.bak$/];
-    return skipPatterns.some((pattern) => pattern.test(baseName));
+  const baseName = path.basename(fileName);
+  const skipPatterns = [/\.git$/, /\.swp$/, /\.swo$/, /~$/, /\.tmp$/, /\.bak$/];
+  return skipPatterns.some((pattern) => pattern.test(baseName));
 }
 ```
 
@@ -142,13 +153,13 @@ config/  tools/  utils/  adapters/
 
 ### 3. 关注点分离
 
-| 层级           | 职责         | 示例                                  |
-| -------------- | ------------ | ------------------------------------- |
-| **入口层**     | 注册和协调   | `extension.ts`                        |
-| **业务层**     | 实现具体功能 | `commands/`, `diagnostics/`, `formatters/` |
-| **插件层**     | 插件管理     | `plugins/`, `di/`                     |
-| **工具层**     | 提供通用能力 | `tools/`, `utils/`, `adapters/`       |
-| **配置层**     | 配置管理     | `config/`, `metrics/`                 |
+| 层级       | 职责         | 示例                                       |
+| ---------- | ------------ | ------------------------------------------ |
+| **入口层** | 注册和协调   | `extension.ts`                             |
+| **业务层** | 实现具体功能 | `commands/`, `diagnostics/`, `formatters/` |
+| **插件层** | 插件管理     | `plugins/`, `di/`                          |
+| **工具层** | 提供通用能力 | `tools/`, `utils/`, `adapters/`            |
+| **配置层** | 配置管理     | `config/`, `metrics/`                      |
 
 ## 核心模块详解
 
@@ -228,71 +239,77 @@ export function activate(context: vscode.ExtensionContext) {
 
 ```typescript
 export class PluginManager {
-    private plugins = new Map<string, IFormatPlugin>();
-    private activePlugins = new Set<string>();
+  private plugins = new Map<string, IFormatPlugin>();
+  private activePlugins = new Set<string>();
 
-    // 注册插件
-    register(plugin: IFormatPlugin): void {
-        this.plugins.set(plugin.name, plugin);
-    }
+  // 注册插件
+  register(plugin: IFormatPlugin): void {
+    this.plugins.set(plugin.name, plugin);
+  }
 
-    // 注销插件
-    unregister(name: string): void {
-        this.plugins.delete(name);
-        this.activePlugins.delete(name);
-    }
+  // 注销插件
+  unregister(name: string): void {
+    this.plugins.delete(name);
+    this.activePlugins.delete(name);
+  }
 
-    // 并行激活多个插件（40% 性能提升）
-    async activateMultiple(names: string[]): Promise<number> {
-        const activationResults = await Promise.all(
-            names.map(async (name) => {
-                const success = await this.activate(name);
-                return { name, success };
-            }),
-        );
-        // 统计成功和失败
-        return activationResults.filter((r) => r.success).length;
-    }
+  // 并行激活多个插件（40% 性能提升）
+  async activateMultiple(names: string[]): Promise<number> {
+    const activationResults = await Promise.all(
+      names.map(async (name) => {
+        const success = await this.activate(name);
+        return { name, success };
+      }),
+    );
+    // 统计成功和失败
+    return activationResults.filter((r) => r.success).length;
+  }
 
-    // 使用活动插件格式化文档
-    async format(document: vscode.TextDocument, options: FormatOptions): Promise<vscode.TextEdit[]> {
-        for (const name of this.activePlugins) {
-            const plugin = this.plugins.get(name);
-            if (plugin) {
-                const edits = await plugin.format(document, options);
-                if (edits && edits.length > 0) {
-                    return edits; // 返回第一个成功的结果
-                }
-            }
+  // 使用活动插件格式化文档
+  async format(
+    document: vscode.TextDocument,
+    options: FormatOptions,
+  ): Promise<vscode.TextEdit[]> {
+    for (const name of this.activePlugins) {
+      const plugin = this.plugins.get(name);
+      if (plugin) {
+        const edits = await plugin.format(document, options);
+        if (edits && edits.length > 0) {
+          return edits; // 返回第一个成功的结果
         }
-        return [];
+      }
+    }
+    return [];
+  }
+
+  // 使用活动插件检查文档
+  async check(
+    document: vscode.TextDocument,
+    options: CheckOptions,
+  ): Promise<CheckResult> {
+    const allDiagnostics: vscode.Diagnostic[] = [];
+    let hasErrors = false;
+
+    for (const name of this.activePlugins) {
+      const plugin = this.plugins.get(name);
+      if (plugin) {
+        const result = await plugin.check(document, options);
+        allDiagnostics.push(...result.diagnostics);
+        if (result.hasErrors) hasErrors = true;
+      }
     }
 
-    // 使用活动插件检查文档
-    async check(document: vscode.TextDocument, options: CheckOptions): Promise<CheckResult> {
-        const allDiagnostics: vscode.Diagnostic[] = [];
-        let hasErrors = false;
+    return { hasErrors, diagnostics: allDiagnostics };
+  }
 
-        for (const name of this.activePlugins) {
-            const plugin = this.plugins.get(name);
-            if (plugin) {
-                const result = await plugin.check(document, options);
-                allDiagnostics.push(...result.diagnostics);
-                if (result.hasErrors) hasErrors = true;
-            }
-        }
+  // 插件状态查询
+  isActive(name: string): boolean {
+    return this.activePlugins.has(name);
+  }
 
-        return { hasErrors, diagnostics: allDiagnostics };
-    }
-
-    // 插件状态查询
-    isActive(name: string): boolean {
-        return this.activePlugins.has(name);
-    }
-
-    getStats(): PluginStats {
-        // 返回插件统计信息
-    }
+  getStats(): PluginStats {
+    // 返回插件统计信息
+  }
 }
 ```
 
@@ -315,90 +332,90 @@ export class PluginManager {
 
 ```typescript
 export class DIContainer {
-    private services = new Map<string, ServiceMetadata<unknown>>();
-    private creatingStack = new Set<string>(); // 循环依赖检测
+  private services = new Map<string, ServiceMetadata<unknown>>();
+  private creatingStack = new Set<string>(); // 循环依赖检测
 
-    // 注册单例服务
-    registerSingleton<T>(
-        name: string,
-        factory: ServiceFactory<T>,
-        dependencies: string[] = [],
-    ): void {
-        this.services.set(name, {
-            factory,
-            instantiated: false,
-            instance: undefined,
-            dependencies,
-        });
+  // 注册单例服务
+  registerSingleton<T>(
+    name: string,
+    factory: ServiceFactory<T>,
+    dependencies: string[] = [],
+  ): void {
+    this.services.set(name, {
+      factory,
+      instantiated: false,
+      instance: undefined,
+      dependencies,
+    });
+  }
+
+  // 注册瞬时服务
+  registerTransient<T>(
+    name: string,
+    factory: ServiceFactory<T>,
+    dependencies: string[] = [],
+  ): void {
+    this.services.set(name, {
+      factory,
+      instantiated: false, // 总是 false，每次创建新实例
+      dependencies,
+    });
+  }
+
+  // 解析服务
+  resolve<T>(name: string): T {
+    const service = this.services.get(name);
+
+    // 检测循环依赖
+    if (this.creatingStack.has(name)) {
+      const cycle = Array.from(this.creatingStack).concat([name]).join(" -> ");
+      throw new Error(`Circular dependency detected: ${cycle}`);
     }
 
-    // 注册瞬时服务
-    registerTransient<T>(
-        name: string,
-        factory: ServiceFactory<T>,
-        dependencies: string[] = [],
-    ): void {
-        this.services.set(name, {
-            factory,
-            instantiated: false, // 总是 false，每次创建新实例
-            dependencies,
-        });
+    // 单例且已实例化，直接返回
+    if (service.instantiated && service.instance !== undefined) {
+      return service.instance as T;
     }
 
-    // 解析服务
-    resolve<T>(name: string): T {
-        const service = this.services.get(name);
+    // 创建新实例
+    this.creatingStack.add(name);
+    try {
+      const instance = service.factory() as T;
 
-        // 检测循环依赖
-        if (this.creatingStack.has(name)) {
-            const cycle = Array.from(this.creatingStack).concat([name]).join(" -> ");
-            throw new Error(`Circular dependency detected: ${cycle}`);
-        }
+      // 如果是单例，缓存实例
+      if (service.instantiated === false) {
+        service.instantiated = true;
+        service.instance = instance;
+      }
 
-        // 单例且已实例化，直接返回
-        if (service.instantiated && service.instance !== undefined) {
-            return service.instance as T;
-        }
-
-        // 创建新实例
-        this.creatingStack.add(name);
-        try {
-            const instance = service.factory() as T;
-
-            // 如果是单例，缓存实例
-            if (service.instantiated === false) {
-                service.instantiated = true;
-                service.instance = instance;
-            }
-
-            return instance;
-        } finally {
-            this.creatingStack.delete(name);
-        }
+      return instance;
+    } finally {
+      this.creatingStack.delete(name);
     }
+  }
 
-    // 重置所有服务（主要用于测试）
-    reset(): void {
-        for (const [, metadata] of this.services.entries()) {
-            metadata.instantiated = false;
-            metadata.instance = undefined;
-        }
-        this.creatingStack.clear();
+  // 重置所有服务（主要用于测试）
+  reset(): void {
+    for (const [, metadata] of this.services.entries()) {
+      metadata.instantiated = false;
+      metadata.instance = undefined;
     }
+    this.creatingStack.clear();
+  }
 
-    // 清理所有服务
-    async cleanup(): Promise<void> {
-        for (const [name, metadata] of this.services.entries()) {
-            if (metadata.instantiated && metadata.instance) {
-                if (hasCleanup(metadata.instance)) {
-                    const result = metadata.instance.cleanup();
-                    if (result && typeof (result as Promise<void>).then === "function") {
-                        await result;
-                    }
-                }
-            }
+  // 清理所有服务
+  async cleanup(): Promise<void> {
+    for (const [name, metadata] of this.services.entries()) {
+      if (metadata.instantiated && metadata.instance) {
+        if (hasCleanup(metadata.instance)) {
+          const result = metadata.instance.cleanup();
+          if (result && typeof (result as Promise<void>).then === "function") {
+            await result;
+          }
         }
+      }
     }
+  }
 }
 ```
 
@@ -421,38 +438,38 @@ export class DIContainer {
 
 ```typescript
 export function initializeDIContainer(container: DIContainer): void {
-    // 1. 注册核心服务
-    container.registerSingleton(
-        ServiceNames.PLUGIN_MANAGER,
-        () => new PluginManager(),
-        [], // 无依赖
-    );
+  // 1. 注册核心服务
+  container.registerSingleton(
+    ServiceNames.PLUGIN_MANAGER,
+    () => new PluginManager(),
+    [], // 无依赖
+  );
 
-    container.registerSingleton(
-        ServiceNames.PERFORMANCE_MONITOR,
-        () => PerformanceMonitor.getInstance(),
-        [],
-    );
+  container.registerSingleton(
+    ServiceNames.PERFORMANCE_MONITOR,
+    () => PerformanceMonitor.getInstance(),
+    [],
+  );
 
-    // 2. 注册插件实例（单例）
-    const shfmtPath = SettingInfo.getShfmtPath();
-    const shellcheckPath = SettingInfo.getShellcheckPath();
-    const indent = SettingInfo.getRealTabSize();
+  // 2. 注册插件实例（单例）
+  const shfmtPath = SettingInfo.getShfmtPath();
+  const shellcheckPath = SettingInfo.getShellcheckPath();
+  const indent = SettingInfo.getRealTabSize();
 
-    container.registerSingleton(
-        ServiceNames.SHFMT_PLUGIN,
-        () => new PureShfmtPlugin(shfmtPath, indent),
-        [],
-    );
+  container.registerSingleton(
+    ServiceNames.SHFMT_PLUGIN,
+    () => new PureShfmtPlugin(shfmtPath, indent),
+    [],
+  );
 
-    container.registerSingleton(
-        ServiceNames.SHELLCHECK_PLUGIN,
-        () => new PureShellcheckPlugin(shellcheckPath),
-        [],
-    );
+  container.registerSingleton(
+    ServiceNames.SHELLCHECK_PLUGIN,
+    () => new PureShellcheckPlugin(shellcheckPath),
+    [],
+  );
 
-    // 3. 验证所有必需的服务都已注册
-    validateRegistrations(container);
+  // 3. 验证所有必需的服务都已注册
+  validateRegistrations(container);
 }
 ```
 
@@ -467,30 +484,36 @@ export function initializeDIContainer(container: DIContainer): void {
 
 ```typescript
 export function initializePlugins(): void {
-    const container = getContainer();
-    const pluginManager = container.resolve<PluginManager>(ServiceNames.PLUGIN_MANAGER);
+  const container = getContainer();
+  const pluginManager = container.resolve<PluginManager>(
+    ServiceNames.PLUGIN_MANAGER,
+  );
 
-    // 获取插件实例
-    const shfmtPlugin = container.resolve<IFormatPlugin>(ServiceNames.SHFMT_PLUGIN);
-    const shellcheckPlugin = container.resolve<IFormatPlugin>(ServiceNames.SHELLCHECK_PLUGIN);
+  // 获取插件实例
+  const shfmtPlugin = container.resolve<IFormatPlugin>(
+    ServiceNames.SHFMT_PLUGIN,
+  );
+  const shellcheckPlugin = container.resolve<IFormatPlugin>(
+    ServiceNames.SHELLCHECK_PLUGIN,
+  );
 
-    // 注册插件到 PluginManager
-    pluginManager.register(shfmtPlugin);
-    pluginManager.register(shellcheckPlugin);
+  // 注册插件到 PluginManager
+  pluginManager.register(shfmtPlugin);
+  pluginManager.register(shellcheckPlugin);
 
-    // 基于配置激活插件
-    const enabledPlugins: string[] = [];
+  // 基于配置激活插件
+  const enabledPlugins: string[] = [];
 
-    if (SettingInfo.isShfmtEnabled()) {
-        enabledPlugins.push("shfmt");
-    }
+  if (SettingInfo.isShfmtEnabled()) {
+    enabledPlugins.push("shfmt");
+  }
 
-    if (SettingInfo.isShellcheckEnabled()) {
-        enabledPlugins.push("shellcheck");
-    }
+  if (SettingInfo.isShellcheckEnabled()) {
+    enabledPlugins.push("shellcheck");
+  }
 
-    // 并行激活插件
-    pluginManager.activateMultiple(enabledPlugins);
+  // 并行激活插件
+  pluginManager.activateMultiple(enabledPlugins);
 }
 ```
 
@@ -533,25 +556,27 @@ pluginManager.check(document, options)
 
 ```typescript
 export async function diagnoseDocument(
-    document: vscode.TextDocument,
-    token?: vscode.CancellationToken,
+  document: vscode.TextDocument,
+  token?: vscode.CancellationToken,
 ): Promise<vscode.Diagnostic[]> {
-    // 检查 onError 配置
-    if (SettingInfo.getOnErrorSetting() === "ignore") {
-        return [];
-    }
+  // 检查 onError 配置
+  if (SettingInfo.getOnErrorSetting() === "ignore") {
+    return [];
+  }
 
-    // 使用 DI 容器获取 PluginManager
-    const container = getContainer();
-    const pluginManager = container.resolve<PluginManager>(ServiceNames.PLUGIN_MANAGER);
+  // 使用 DI 容器获取 PluginManager
+  const container = getContainer();
+  const pluginManager = container.resolve<PluginManager>(
+    ServiceNames.PLUGIN_MANAGER,
+  );
 
-    // 调用插件检查文档
-    const result = await pluginManager.check(document, {
-        token,
-        timeout: undefined,
-    });
+  // 调用插件检查文档
+  const result = await pluginManager.check(document, {
+    token,
+    timeout: undefined,
+  });
 
-    return result.diagnostics;
+  return result.diagnostics;
 }
 ```
 
@@ -585,19 +610,21 @@ pluginManager.format(document, options)
 
 ```typescript
 export async function formatDocument(
-    document: vscode.TextDocument,
-    options?: vscode.FormattingOptions,
-    token?: vscode.CancellationToken,
+  document: vscode.TextDocument,
+  options?: vscode.FormattingOptions,
+  token?: vscode.CancellationToken,
 ): Promise<vscode.TextEdit[]> {
-    // 使用 DI 容器获取 PluginManager
-    const container = getContainer();
-    const pluginManager = container.resolve<PluginManager>(ServiceNames.PLUGIN_MANAGER);
+  // 使用 DI 容器获取 PluginManager
+  const container = getContainer();
+  const pluginManager = container.resolve<PluginManager>(
+    ServiceNames.PLUGIN_MANAGER,
+  );
 
-    // 调用插件格式化文档
-    return await pluginManager.format(document, {
-        token,
-        timeout: undefined,
-    });
+  // 调用插件格式化文档
+  return await pluginManager.format(document, {
+    token,
+    timeout: undefined,
+  });
 }
 ```
 
@@ -637,36 +664,36 @@ provideCodeActions()
 
 ```typescript
 export class DiagnosticAdapter {
-    static convert(
-        result: ToolResult,
-        document: vscode.TextDocument,
-        source: string,
-    ): vscode.Diagnostic[] {
-        const diagnostics: vscode.Diagnostic[] = [];
+  static convert(
+    result: ToolResult,
+    document: vscode.TextDocument,
+    source: string,
+  ): vscode.Diagnostic[] {
+    const diagnostics: vscode.Diagnostic[] = [];
 
-        // 语法错误
-        if (result.syntaxErrors) {
-            for (const error of result.syntaxErrors) {
-                diagnostics.push(this.createSyntaxError(error, document, source));
-            }
-        }
-
-        // 格式问题
-        if (result.formatIssues) {
-            for (const issue of result.formatIssues) {
-                diagnostics.push(this.createFormatIssue(issue, source));
-            }
-        }
-
-        // Linter 问题
-        if (result.linterIssues) {
-            for (const issue of result.linterIssues) {
-                diagnostics.push(this.createLinterIssue(issue, source));
-            }
-        }
-
-        return diagnostics;
+    // 语法错误
+    if (result.syntaxErrors) {
+      for (const error of result.syntaxErrors) {
+        diagnostics.push(this.createSyntaxError(error, document, source));
+      }
     }
+
+    // 格式问题
+    if (result.formatIssues) {
+      for (const issue of result.formatIssues) {
+        diagnostics.push(this.createFormatIssue(issue, source));
+      }
+    }
+
+    // Linter 问题
+    if (result.linterIssues) {
+      for (const issue of result.linterIssues) {
+        diagnostics.push(this.createLinterIssue(issue, source));
+      }
+    }
+
+    return diagnostics;
+  }
 }
 ```
 
@@ -682,56 +709,58 @@ export class DiagnosticAdapter {
 
 ```typescript
 export class SettingInfo {
-    private static configCache: ConfigCache | null = null;
+  private static configCache: ConfigCache | null = null;
 
-    // 初始化或刷新配置缓存
-    static refreshCache(): void {
-        this.configCache = {
-            tabSize: this.getTabSizeImpl(),
-            log: this.getLogImpl(),
-            onError: this.getOnErrorImpl(),
-            plugins: {
-                shfmt: {
-                    enabled: this.getShfmtEnabledImpl(),
-                    path: this.getShfmtPathImpl(),
-                },
-                shellcheck: {
-                    enabled: this.getShellcheckEnabledImpl(),
-                    path: this.getShellcheckPathImpl(),
-                },
-            },
-        };
+  // 初始化或刷新配置缓存
+  static refreshCache(): void {
+    this.configCache = {
+      tabSize: this.getTabSizeImpl(),
+      log: this.getLogImpl(),
+      onError: this.getOnErrorImpl(),
+      plugins: {
+        shfmt: {
+          enabled: this.getShfmtEnabledImpl(),
+          path: this.getShfmtPathImpl(),
+        },
+        shellcheck: {
+          enabled: this.getShellcheckEnabledImpl(),
+          path: this.getShellcheckPathImpl(),
+        },
+      },
+    };
+  }
+
+  // 配置变更检测
+  static isConfigurationChanged(
+    event: vscode.ConfigurationChangeEvent,
+  ): boolean {
+    const keys = [
+      "shell-format.plugins.shfmt",
+      "shell-format.plugins.shellcheck",
+      "shell-format.tabSize",
+      "shell-format.log",
+      "shell-format.onError",
+    ];
+
+    for (const key of keys) {
+      if (event.affectsConfiguration(key)) {
+        return true;
+      }
     }
 
-    // 配置变更检测
-    static isConfigurationChanged(event: vscode.ConfigurationChangeEvent): boolean {
-        const keys = [
-            "shell-format.plugins.shfmt",
-            "shell-format.plugins.shellcheck",
-            "shell-format.tabSize",
-            "shell-format.log",
-            "shell-format.onError",
-        ];
+    return false;
+  }
 
-        for (const key of keys) {
-            if (event.affectsConfiguration(key)) {
-                return true;
-            }
-        }
+  // 插件配置
+  static isShfmtEnabled(): boolean {
+    this.ensureCacheInitialized();
+    return this.configCache!.plugins.shfmt.enabled;
+  }
 
-        return false;
-    }
-
-    // 插件配置
-    static isShfmtEnabled(): boolean {
-        this.ensureCacheInitialized();
-        return this.configCache!.plugins.shfmt.enabled;
-    }
-
-    static getShfmtPath(): string {
-        this.ensureCacheInitialized();
-        return this.configCache!.plugins.shfmt.path;
-    }
+  static getShfmtPath(): string {
+    this.ensureCacheInitialized();
+    return this.configCache!.plugins.shfmt.path;
+  }
 }
 ```
 
@@ -753,33 +782,33 @@ export class SettingInfo {
 
 ```typescript
 export class PerformanceMonitor {
-    private static instance: PerformanceMonitor;
+  private static instance: PerformanceMonitor;
 
-    private metrics = new Map<string, PerformanceMetric>();
+  private metrics = new Map<string, PerformanceMetric>();
 
-    record(name: string, duration: number): void {
-        const metric = this.metrics.get(name) || {
-            count: 0,
-            totalDuration: 0,
-            minDuration: Infinity,
-            maxDuration: 0,
-        };
+  record(name: string, duration: number): void {
+    const metric = this.metrics.get(name) || {
+      count: 0,
+      totalDuration: 0,
+      minDuration: Infinity,
+      maxDuration: 0,
+    };
 
-        metric.count++;
-        metric.totalDuration += duration;
-        metric.minDuration = Math.min(metric.minDuration, duration);
-        metric.maxDuration = Math.max(metric.maxDuration, duration);
+    metric.count++;
+    metric.totalDuration += duration;
+    metric.minDuration = Math.min(metric.minDuration, duration);
+    metric.maxDuration = Math.max(metric.maxDuration, duration);
 
-        this.metrics.set(name, metric);
-    }
+    this.metrics.set(name, metric);
+  }
 
-    getReport(): string {
-        // 生成性能报告
-    }
+  getReport(): string {
+    // 生成性能报告
+  }
 
-    reset(): void {
-        this.metrics.clear();
-    }
+  reset(): void {
+    this.metrics.clear();
+  }
 }
 ```
 
@@ -791,30 +820,36 @@ export class PerformanceMonitor {
 
 ```typescript
 export interface IFormatPlugin {
-    name: string;
-    displayName: string;
-    version: string;
-    description: string;
-    isAvailable(): Promise<boolean>;
-    format(document: TextDocument, options: FormatOptions): Promise<TextEdit[]>;
-    check(document: TextDocument, options: CheckOptions): Promise<CheckResult>;
-    getSupportedExtensions(): string[];
+  name: string;
+  displayName: string;
+  version: string;
+  description: string;
+  isAvailable(): Promise<boolean>;
+  format(document: TextDocument, options: FormatOptions): Promise<TextEdit[]>;
+  check(document: TextDocument, options: CheckOptions): Promise<CheckResult>;
+  getSupportedExtensions(): string[];
 }
 
 // 插件实现示例
 export class PureShfmtPlugin implements IFormatPlugin {
-    name = "shfmt";
-    displayName = "Shfmt";
-    version = "3.7.0";
-    description = "Shell script formatter";
+  name = "shfmt";
+  displayName = "Shfmt";
+  version = "3.7.0";
+  description = "Shell script formatter";
 
-    async format(document: TextDocument, options: FormatOptions): Promise<TextEdit[]> {
-        // 格式化逻辑
-    }
+  async format(
+    document: TextDocument,
+    options: FormatOptions,
+  ): Promise<TextEdit[]> {
+    // 格式化逻辑
+  }
 
-    async check(document: TextDocument, options: CheckOptions): Promise<CheckResult> {
-        // 检查逻辑
-    }
+  async check(
+    document: TextDocument,
+    options: CheckOptions,
+  ): Promise<CheckResult> {
+    // 检查逻辑
+  }
 }
 ```
 
@@ -827,23 +862,23 @@ export class PureShfmtPlugin implements IFormatPlugin {
 let globalPluginManager: PluginManager | null = null;
 
 export function getPluginManager(): PluginManager {
-    if (!globalPluginManager) {
-        globalPluginManager = new PluginManager();
-        logger.info("Global plugin manager initialized");
-    }
-    return globalPluginManager;
+  if (!globalPluginManager) {
+    globalPluginManager = new PluginManager();
+    logger.info("Global plugin manager initialized");
+  }
+  return globalPluginManager;
 }
 
 // PerformanceMonitor 单例
 export class PerformanceMonitor {
-    private static instance: PerformanceMonitor;
+  private static instance: PerformanceMonitor;
 
-    static getInstance(): PerformanceMonitor {
-        if (!PerformanceMonitor.instance) {
-            PerformanceMonitor.instance = new PerformanceMonitor();
-        }
-        return PerformanceMonitor.instance;
+  static getInstance(): PerformanceMonitor {
+    if (!PerformanceMonitor.instance) {
+      PerformanceMonitor.instance = new PerformanceMonitor();
     }
+    return PerformanceMonitor.instance;
+  }
 }
 ```
 
@@ -854,13 +889,15 @@ export class PerformanceMonitor {
 ```typescript
 // 注册服务
 container.registerSingleton(
-    ServiceNames.PLUGIN_MANAGER,
-    () => new PluginManager(),
-    [],
+  ServiceNames.PLUGIN_MANAGER,
+  () => new PluginManager(),
+  [],
 );
 
 // 解析服务
-const pluginManager = container.resolve<PluginManager>(ServiceNames.PLUGIN_MANAGER);
+const pluginManager = container.resolve<PluginManager>(
+  ServiceNames.PLUGIN_MANAGER,
+);
 ```
 
 ### 4. Provider 模式
@@ -879,13 +916,13 @@ VSCode 使用 Provider 模式来扩展编辑器功能：
 
 ```typescript
 export class DiagnosticAdapter {
-    static convert(
-        result: ToolResult,
-        document: vscode.TextDocument,
-        source: string,
-    ): vscode.Diagnostic[] {
-        // 转换逻辑
-    }
+  static convert(
+    result: ToolResult,
+    document: vscode.TextDocument,
+    source: string,
+  ): vscode.Diagnostic[] {
+    // 转换逻辑
+  }
 }
 ```
 
@@ -896,34 +933,34 @@ export class DiagnosticAdapter {
 ```typescript
 // 文档保存时触发
 const saveListener = vscode.workspace.onDidSaveTextDocument((document) => {
-    if (isShellScript(document)) {
-        diagnoseDocument(document);
-    }
+  if (isShellScript(document)) {
+    diagnoseDocument(document);
+  }
 });
 
 // 文档打开时触发
 const openListener = vscode.workspace.onDidOpenTextDocument((document) => {
-    if (isShellScript(document)) {
-        diagnoseDocument(document);
-    }
+  if (isShellScript(document)) {
+    diagnoseDocument(document);
+  }
 });
 
 // 文档变化时防抖触发
 const changeListener = vscode.workspace.onDidChangeTextDocument((event) => {
-    if (isShellScript(event.document)) {
-        debounceManager.debounce(uri, () => diagnoseDocument(event.document), 300);
-    }
+  if (isShellScript(event.document)) {
+    debounceManager.debounce(uri, () => diagnoseDocument(event.document), 300);
+  }
 });
 
 // 配置变更时触发
 const configListener = vscode.workspace.onDidChangeConfiguration((event) => {
-    if (SettingInfo.isConfigurationChanged(event)) {
-        // 重置 DI 容器和重新激活插件
-        const container = getContainer();
-        container.reset();
-        initializeDIContainer(container);
-        initializePlugins();
-    }
+  if (SettingInfo.isConfigurationChanged(event)) {
+    // 重置 DI 容器和重新激活插件
+    const container = getContainer();
+    container.reset();
+    initializeDIContainer(container);
+    initializePlugins();
+  }
 });
 ```
 
@@ -946,6 +983,7 @@ async activateMultiple(names: string[]): Promise<number> {
 ```
 
 **性能提升**：
+
 - 串行激活：250ms
 - 并行激活：150ms
 - **提升：40%**
@@ -955,10 +993,14 @@ async activateMultiple(names: string[]): Promise<number> {
 编辑时使用 300ms 防抖，避免频繁触发诊断：
 
 ```typescript
-debounceManager.debounce(uri, async () => {
+debounceManager.debounce(
+  uri,
+  async () => {
     const diagnostics = await diagnoseDocument(event.document);
     diagnosticCollection.set(event.document.uri, diagnostics);
-}, 300);
+  },
+  300,
+);
 ```
 
 ### 3. 按需诊断
@@ -1007,11 +1049,10 @@ format(document: TextDocument, options: FormatOptions): Promise<TextEdit[]> {
 ### 1. 外部命令错误
 
 ```typescript
-plugin.format(document, options)
-    .catch((error) => {
-        logger.error(`Plugin "${name}" format failed: ${String(error)}`);
-        return [];
-    });
+plugin.format(document, options).catch((error) => {
+  logger.error(`Plugin "${name}" format failed: ${String(error)}`);
+  return [];
+});
 ```
 
 ### 2. 插件可用性检查
@@ -1039,10 +1080,10 @@ async activate(name: string): Promise<boolean> {
 
 ```typescript
 try {
-    SettingInfo.refreshCache();
-    // ...
+  SettingInfo.refreshCache();
+  // ...
 } catch (error) {
-    logger.error(`Error handling configuration change: ${String(error)}`);
+  logger.error(`Error handling configuration change: ${String(error)}`);
 }
 ```
 
@@ -1091,18 +1132,18 @@ if (SettingInfo.isMyPluginEnabled()) {
 ```typescript
 // 在 commands/ 下创建新文件
 export function registerMyCommand(): vscode.Disposable {
-    return vscode.commands.registerCommand("shell-format.myCommand", () => {
-        // 实现命令逻辑
-    });
+  return vscode.commands.registerCommand("shell-format.myCommand", () => {
+    // 实现命令逻辑
+  });
 }
 
 // 在 index.ts 中注册
 export function registerAllCommands(): vscode.Disposable[] {
-    return [
-        registerFormatCommand(),
-        registerFixCommand(),
-        registerMyCommand(), // 注册新命令
-    ];
+  return [
+    registerFormatCommand(),
+    registerFixCommand(),
+    registerMyCommand(), // 注册新命令
+  ];
 }
 ```
 
@@ -1157,7 +1198,9 @@ const result = await shfmtService.format(fileName, token);
 
 // 新架构：插件架构
 const container = getContainer();
-const pluginManager = container.resolve<PluginManager>(ServiceNames.PLUGIN_MANAGER);
+const pluginManager = container.resolve<PluginManager>(
+  ServiceNames.PLUGIN_MANAGER,
+);
 const result = await pluginManager.format(document, { token });
 ```
 

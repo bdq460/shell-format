@@ -3,10 +3,15 @@
  *
  * 定义格式化工具和检查工具的插件接口
  * 支持动态加载和扩展不同的格式化工具
+ *
+ * 架构：
+ * - IFormatPlugin 扩展 IPlugin（通用插件机制）
+ * - 添加 VSCode 特定的格式化和检查方法
  */
 
 import { Diagnostic, TextDocument, TextEdit } from "vscode";
 import { CancellationToken } from "../tools/executor/types";
+import { IPlugin } from "../utils/plugin";
 
 /**
  * 通用格式化选项
@@ -52,34 +57,10 @@ export interface PluginFormatResult extends PluginCommonResult {
 
 /**
  * 格式化和检查插件接口
+ *
+ * 扩展通用插件接口，添加 VSCode 特定的格式化和检查方法
  */
-export interface IFormatPlugin {
-    /**
-     * 插件名称（唯一标识符）
-     */
-    name: string;
-
-    /**
-     * 插件显示名称
-     */
-    displayName: string;
-
-    /**
-     * 插件版本
-     */
-    version: string;
-
-    /**
-     * 插件描述
-     */
-    description: string;
-
-    /**
-     * 检查插件是否可用
-     * @returns 是否可用
-     */
-    isAvailable(): Promise<boolean>;
-
+export interface IFormatPlugin extends IPlugin {
     /**
      * 格式化内容
      * @param document 文档对象
@@ -107,22 +88,4 @@ export interface IFormatPlugin {
      * @returns 文件扩展名数组（如 ['.sh', '.bash']）
      */
     getSupportedExtensions(): string[];
-
-    /**
-     * 插件激活时调用（可选）
-     * 用于初始化资源、注册事件监听器等
-     */
-    onActivate?(): void | Promise<void>;
-
-    /**
-     * 插件停用时调用（可选）
-     * 用于清理资源、取消事件监听器等
-     */
-    onDeactivate?(): void | Promise<void>;
-
-    /**
-     * 插件配置变更时调用（可选）
-     * @param config 新的配置对象
-     */
-    onConfigChange?(config: any): void | Promise<void>;
 }

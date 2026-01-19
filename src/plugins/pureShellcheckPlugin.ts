@@ -93,4 +93,46 @@ export class PureShellcheckPlugin extends BaseFormatPlugin {
     getSupportedExtensions(): string[] {
         return PackageInfo.fileExtensions;
     }
+
+    /**
+     * 插件激活时的钩子
+     * 订阅配置变更消息
+     */
+    async onActivate(): Promise<void> {
+        logger.info(`${this.name} plugin activated`);
+
+        // 订阅配置变更消息
+        if (this.messageBus) {
+            this.configChangeSubId = this.messageBus.subscribe(
+                "config:change",
+                (msg: any) => {
+                    logger.debug(`${this.name} received config:change message`);
+                },
+            );
+            logger.debug(`${this.name} subscribed to config:change messages`);
+        }
+    }
+
+    /**
+     * 插件停用时的钩子
+     * 取消配置变更消息订阅
+     */
+    async onDeactivate(): Promise<void> {
+        logger.info(`${this.name} plugin deactivated`);
+
+        // 取消配置变更消息订阅
+        if (this.messageBus && this.configChangeSubId) {
+            this.messageBus.unsubscribe(this.configChangeSubId);
+            this.configChangeSubId = undefined;
+            logger.debug(`${this.name} unsubscribed from config:change messages`);
+        }
+    }
+
+    /**
+     * 获取插件依赖
+     * shellcheck 不依赖于其他插件
+     */
+    getDependencies() {
+        return [];
+    }
 }

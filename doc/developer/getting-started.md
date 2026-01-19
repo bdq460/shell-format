@@ -272,7 +272,9 @@ import { PluginManager } from "../plugins";
 const container = getContainer();
 
 // 获取 PluginManager
-const pluginManager = container.resolve<PluginManager>(ServiceNames.PLUGIN_MANAGER);
+const pluginManager = container.resolve<PluginManager>(
+  ServiceNames.PLUGIN_MANAGER,
+);
 
 // 查看插件状态
 const stats = pluginManager.getStats();
@@ -289,10 +291,60 @@ logger.info(`Active plugins: ${activePlugins.join(", ")}`);
 
 完成快速开始后，建议:
 
-1. 阅读 [架构设计文档](architecture.md) 了解项目架构
-2. 阅读 [架构评审报告](../ARCHITECTURE_REVIEW.md) 了解架构质量评估
+1. 阅读 [插件机制完整指南](./plugin.md) 了解插件系统
+2. 阅读 [架构设计文档](architecture.md) 了解项目架构
 3. 查看 [源代码](../../src/) 了解具体实现
 4. 查看 [VSCode Extension API](../vscode/extension-api.md) 了解 API 使用
+
+---
+
+## 创建第一个插件
+
+快速示例：创建一个简单的日志插件
+
+```typescript
+// src/plugins/myFirstPlugin.ts
+import { BasePlugin } from "../utils/plugin";
+import { logger } from "../utils/log";
+
+export class MyFirstPlugin extends BasePlugin {
+  get name() {
+    return "my-first";
+  }
+  get displayName() {
+    return "My First Plugin";
+  }
+  get version() {
+    return "1.0.0";
+  }
+  get description() {
+    return "My first plugin";
+  }
+
+  async isAvailable(): Promise<boolean> {
+    return true; // 插件总是可用
+  }
+
+  async onActivate(): Promise<void> {
+    logger.info(`${this.name} activated!`);
+
+    // 订阅配置变更
+    this.subscribeMessage("config:change", (msg) => {
+      logger.info("Config changed:", msg.payload);
+    });
+  }
+
+  async onDeactivate(): Promise<void> {
+    logger.info(`${this.name} deactivated`);
+  }
+
+  getCapabilities() {
+    return ["log", "monitor"];
+  }
+}
+```
+
+更多详情请参考 [插件机制完整指南](./plugin.md)
 
 ---
 
@@ -300,14 +352,15 @@ logger.info(`Active plugins: ${activePlugins.join(", ")}`);
 
 如果遇到问题:
 
-1. 查看项目文档
-2. 查看 [VSCode 扩展开发文档](https://code.visualstudio.com/api)
-3. 在 [GitHub Issues](https://github.com/bdq460/shell-format/issues) 中提问
+1. 查看 [插件机制完整指南](./plugin.md) - 插件开发完整参考
+2. 查看项目文档
+3. 查看 [VSCode 扩展开发文档](https://code.visualstudio.com/api)
+4. 在 [GitHub Issues](https://github.com/bdq460/shell-format/issues) 中提问
 
 ---
 
 ## 相关资源
 
+- [插件机制完整指南](./plugin.md) - 插件开发完整参考
 - [架构设计文档](architecture.md) - 项目架构详细说明
-- [架构优化总结](../ARCHITECTURE_OPTIMIZATION.md) - 性能优化实施细节
 - [VSCode 扩展开发文档](https://code.visualstudio.com/api) - 官方 API 文档

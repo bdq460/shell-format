@@ -1,13 +1,19 @@
 /**
- * 插件管理器
+ * VSCode 插件管理器
  *
  * 管理格式化和检查插件的注册、加载和调用
  * 支持动态加载和插件生命周期管理
+ *
+ * 架构：
+ * - 使用通用 PluginManager 管理插件生命周期
+ * - 添加 VSCode 特定的 format 和 check 方法
+ * - 提供错误诊断创建等 VSCode 特定功能
  */
 
 import * as vscode from "vscode";
 import { PERFORMANCE_METRICS } from "../metrics";
 import { logger, startTimer } from "../utils";
+import { PluginManager as BasePluginManager } from "../utils/plugin";
 import {
     IFormatPlugin,
     PluginCheckOptions,
@@ -17,32 +23,28 @@ import {
 } from "./pluginInterface";
 
 /**
- * 插件管理器
+ * VSCode 插件管理器
+ *
+ * 继承通用插件管理器的功能，添加 VSCode 特定的格式化和检查方法
  */
 export class PluginManager {
-    private plugins = new Map<string, IFormatPlugin>();
-    private activePlugins = new Set<string>();
+    private baseManager: BasePluginManager<IFormatPlugin>;
+
+    constructor() {
+        this.baseManager = new BasePluginManager({
+            // 不在钩子失败时抛出异常，只记录日志
+            throwOnActivationError: false,
+            throwOnDeactivationError: false,
+        });
+    }
 
     /**
      * 注册插件
      * @param plugin 插件实例
      */
     register(plugin: IFormatPlugin): void {
-        const existingPlugin = this.plugins.get(plugin.name);
-
-        if (existingPlugin) {
-            logger.warn(
-                `Plugin "${plugin.name}" is already registered, will be overwritten`,
-            );
-        }
-
-        this.plugins.set(plugin.name, plugin);
-        logger.info(
-            `Registered plugin: ${plugin.name} v${plugin.version} (${plugin.displayName})`,
-        );
-        logger.debug(
-            `Total plugins registered: ${this.plugins.size}, Active plugins: ${this.activePlugins.size}`,
-        );
+        this.baseManager.register(plugin);
+        logger.info(`Registered plugin: ${plugin.name} v${plugin.version} (${plugin.displayName})`);
     }
 
     /**
@@ -50,32 +52,8 @@ export class PluginManager {
      * @param name 插件名称
      */
     async unregister(name: string): Promise<void> {
-        const plugin = this.plugins.get(name);
-
-        if (!plugin) {
-            logger.warn(`Plugin "${name}" is not registered`);
-            return;
-        }
-
-        // 调用插件停用钩子
-        if (plugin.onDeactivate) {
-            try {
-                const result = plugin.onDeactivate();
-                if (result instanceof Promise) {
-                    await result;
-                }
-                logger.debug(`Plugin "${name}" onDeactivate hook executed`);
-            } catch (error) {
-                logger.error(`Plugin "${name}" onDeactivate hook failed: ${String(error)}`);
-            }
-        }
-
-        this.plugins.delete(name);
-        this.activePlugins.delete(name);
+        await this.baseManager.unregister(name);
         logger.info(`Unregistered plugin: ${name}`);
-        logger.debug(
-            `Total plugins registered: ${this.plugins.size}, Active plugins: ${this.activePlugins.size}`,
-        );
     }
 
     /**
@@ -84,7 +62,7 @@ export class PluginManager {
      * @returns 插件实例，如果不存在则返回 undefined
      */
     get(name: string): IFormatPlugin | undefined {
-        return this.plugins.get(name);
+        return this.baseManager.get(name);
     }
 
     /**
@@ -93,7 +71,7 @@ export class PluginManager {
      * @returns 是否已注册
      */
     has(name: string): boolean {
-        return this.plugins.has(name);
+        return this.baseManager.has(name);
     }
 
     /**
@@ -101,7 +79,7 @@ export class PluginManager {
      * @returns 插件实例数组
      */
     getAll(): IFormatPlugin[] {
-        return Array.from(this.plugins.values());
+        return this.baseManager.getAll();
     }
 
     /**
@@ -110,39 +88,13 @@ export class PluginManager {
      */
     async getAvailablePlugins(): Promise<IFormatPlugin[]> {
         const timer = startTimer(PERFORMANCE_METRICS.PLUGIN_LOAD_DURATION);
-        logger.info(`Checking availability of ${this.plugins.size} plugins`);
+        logger.info(`Checking availability of plugins`);
 
-        const plugins = Array.from(this.plugins.values());
-        const availablePlugins: IFormatPlugin[] = [];
-        const errors: string[] = [];
-
-        await Promise.all(
-            plugins.map(async (plugin) => {
-                try {
-                    logger.debug(`Checking plugin: ${plugin.name}`);
-                    const isAvailable = await plugin.isAvailable();
-                    if (isAvailable) {
-                        availablePlugins.push(plugin);
-                        logger.debug(`Plugin "${plugin.name}" is available`);
-                    } else {
-                        logger.warn(`Plugin "${plugin.name}" is not available`);
-                    }
-                } catch (error) {
-                    const msg = `Error checking availability of plugin "${plugin.name}": ${String(error)}`;
-                    logger.error(msg);
-                    errors.push(msg);
-                }
-            }),
-        );
+        const plugins = await this.baseManager.getAvailablePlugins();
 
         timer.stop();
-        logger.info(
-            `Available plugins: ${availablePlugins.length}/${plugins.length}`,
-        );
-        if (errors.length > 0) {
-            logger.warn(`Plugin availability errors: \n${errors.join("\n")}`);
-        }
-        return availablePlugins;
+        logger.info(`Available plugins: ${plugins.length}/${this.baseManager.getStats().total}`);
+        return plugins;
     }
 
     /**
@@ -158,11 +110,12 @@ export class PluginManager {
         const timer = startTimer(
             PERFORMANCE_METRICS.PLUGIN_EXECUTE_FORMAT_DURATION,
         );
+        const activePluginNames = this.baseManager.getActivePluginNames();
         logger.info(
-            `Formatting document: ${document.fileName} with ${this.activePlugins.size} active plugins`,
+            `Formatting document: ${document.fileName} with ${activePluginNames.length} active plugins`,
         );
 
-        if (this.activePlugins.size === 0) {
+        if (activePluginNames.length === 0) {
             logger.warn("No active plugins available for formatting");
             timer.stop();
             return {
@@ -176,8 +129,8 @@ export class PluginManager {
         const errors: string[] = [];
         let hasErrors = false;
 
-        for (const name of this.activePlugins) {
-            const plugin = this.plugins.get(name);
+        for (const name of activePluginNames) {
+            const plugin = this.baseManager.get(name);
 
             if (plugin) {
                 try {
@@ -255,11 +208,12 @@ export class PluginManager {
         options: PluginCheckOptions,
     ): Promise<PluginCheckResult> {
         const timer = startTimer(PERFORMANCE_METRICS.PLUGIN_EXECUTE_CHECK_DURATION);
+        const activePluginNames = this.baseManager.getActivePluginNames();
         logger.info(
-            `Checking document: ${document.fileName} with ${this.activePlugins.size} active plugins`,
+            `Checking document: ${document.fileName} with ${activePluginNames.length} active plugins`,
         );
 
-        if (this.activePlugins.size === 0) {
+        if (activePluginNames.length === 0) {
             logger.warn("No active plugins available for checking");
             timer.stop();
             return {
@@ -272,8 +226,8 @@ export class PluginManager {
         let hasErrors = false;
         const errors: string[] = [];
 
-        for (const name of this.activePlugins) {
-            const plugin = this.plugins.get(name);
+        for (const name of activePluginNames) {
+            const plugin = this.baseManager.get(name);
 
             if (plugin) {
                 try {
@@ -311,7 +265,7 @@ export class PluginManager {
             logger.warn(`Check errors: \n${errors.join("\n")}`);
         }
         logger.info(
-            `Checking completed: ${allDiagnostics.length} total diagnostics from ${this.activePlugins.size} plugins`,
+            `Checking completed: ${allDiagnostics.length} total diagnostics from ${activePluginNames.length} plugins`,
         );
 
         return {
@@ -324,8 +278,7 @@ export class PluginManager {
      * 清除所有插件
      */
     clear(): void {
-        this.plugins.clear();
-        this.activePlugins.clear();
+        this.baseManager.clear();
         logger.info("Cleared all plugins");
     }
 
@@ -360,26 +313,8 @@ export class PluginManager {
      * 停用所有插件
      */
     async deactivateAll(): Promise<void> {
-        const count = this.activePlugins.size;
-
-        // 调用所有活动插件的停用钩子
-        for (const name of this.activePlugins) {
-            const plugin = this.plugins.get(name);
-            if (plugin && plugin.onDeactivate) {
-                try {
-                    const result = plugin.onDeactivate();
-                    if (result instanceof Promise) {
-                        await result;
-                    }
-                    logger.debug(`Plugin "${name}" onDeactivate hook executed`);
-                } catch (error) {
-                    logger.error(`Plugin "${name}" onDeactivate hook failed: ${String(error)}`);
-                }
-            }
-        }
-
-        this.activePlugins.clear();
-        logger.info(`Deactivated all ${count} plugins`);
+        await this.baseManager.deactivateAll();
+        logger.info(`Deactivated all plugins`);
     }
 
     /**
@@ -389,8 +324,7 @@ export class PluginManager {
      */
     async reactivate(names: string[]): Promise<number> {
         logger.info("Reactivating plugins: deactivate all then activate selected");
-        await this.deactivateAll();
-        return this.activateMultiple(names);
+        return this.baseManager.reactivate(names);
     }
 
     /**
@@ -402,29 +336,9 @@ export class PluginManager {
         const timer = startTimer(PERFORMANCE_METRICS.PLUGIN_LOAD_DURATION);
         logger.info(`Activating ${names.length} plugins`);
 
-        const activationResults = await Promise.all(
-            names.map(async (name) => {
-                const success = await this.activate(name);
-                return { name, success };
-            }),
-        );
-
-        const successCount = activationResults.filter((r) => r.success).length;
-        const failedPlugins = activationResults
-            .filter((r) => !r.success)
-            .map((r) => r.name);
+        const successCount = await this.baseManager.activateMultiple(names);
 
         timer.stop();
-        if (failedPlugins.length > 0) {
-            logger.warn(
-                `Plugin activation completed: ${successCount}/${names.length} successful (failed: ${failedPlugins.join(", ")})`,
-            );
-        } else {
-            logger.info(
-                `Plugin activation completed: ${successCount}/${names.length} successful`,
-            );
-        }
-
         return successCount;
     }
 
@@ -434,48 +348,16 @@ export class PluginManager {
      * @returns 是否激活成功
      */
     async activate(name: string): Promise<boolean> {
-        const plugin = this.plugins.get(name);
-        if (!plugin) {
-            logger.error(`Plugin "${name}" is not registered`);
-            return false;
-        }
+        return this.baseManager.activate(name);
+    }
 
-        // 如果已经激活，先调用停用钩子再激活
-        if (this.activePlugins.has(name) && plugin.onDeactivate) {
-            try {
-                const result = plugin.onDeactivate();
-                if (result instanceof Promise) {
-                    await result;
-                }
-                logger.debug(`Plugin "${name}" onDeactivate hook executed before reactivation`);
-            } catch (error) {
-                logger.error(`Plugin "${name}" onDeactivate hook failed: ${String(error)}`);
-            }
-        }
-
-        const isAvailable = await plugin.isAvailable();
-        if (!isAvailable) {
-            logger.warn(`Plugin "${name}" is not available`);
-            return false;
-        }
-
-        // 调用插件激活钩子
-        if (plugin.onActivate) {
-            try {
-                const result = plugin.onActivate();
-                if (result instanceof Promise) {
-                    await result;
-                }
-                logger.debug(`Plugin "${name}" onActivate hook executed`);
-            } catch (error) {
-                logger.error(`Plugin "${name}" onActivate hook failed: ${String(error)}`);
-                // 激活钩子失败不影响插件激活，只记录日志
-            }
-        }
-
-        this.activePlugins.add(name);
-        logger.info(`Activated plugin: ${name}`);
-        return true;
+    /**
+     * 停用插件
+     * @param name 插件名称
+     * @returns 是否停用成功
+     */
+    async deactivate(name: string): Promise<boolean> {
+        return this.baseManager.deactivate(name);
     }
 
     /**
@@ -484,7 +366,7 @@ export class PluginManager {
      * @returns 是否活动
      */
     isActive(name: string): boolean {
-        return this.activePlugins.has(name);
+        return this.baseManager.isActive(name);
     }
 
     /**
@@ -492,7 +374,7 @@ export class PluginManager {
      * @returns 活动插件名称数组
      */
     getActivePluginNames(): string[] {
-        return Array.from(this.activePlugins);
+        return this.baseManager.getActivePluginNames();
     }
 
     /**
@@ -509,41 +391,7 @@ export class PluginManager {
             active: boolean;
         }>;
     } {
-        const plugins = Array.from(this.plugins.values()).map((plugin) => ({
-            name: plugin.name,
-            displayName: plugin.displayName,
-            version: plugin.version,
-            active: this.activePlugins.has(plugin.name),
-        }));
-
-        return {
-            total: plugins.length,
-            active: this.activePlugins.size,
-            plugins,
-        };
-    }
-
-    /**
-     * 通知所有活动插件配置已变更
-     * @param config 新的配置对象
-     */
-    async notifyConfigChange(config: any): Promise<void> {
-        logger.info(`Notifying ${this.activePlugins.size} active plugins of config change`);
-
-        for (const name of this.activePlugins) {
-            const plugin = this.plugins.get(name);
-            if (plugin && plugin.onConfigChange) {
-                try {
-                    const result = plugin.onConfigChange(config);
-                    if (result instanceof Promise) {
-                        await result;
-                    }
-                    logger.debug(`Plugin "${name}" onConfigChange hook executed`);
-                } catch (error) {
-                    logger.error(`Plugin "${name}" onConfigChange hook failed: ${String(error)}`);
-                }
-            }
-        }
+        return this.baseManager.getStats();
     }
 }
 
