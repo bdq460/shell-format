@@ -49,7 +49,7 @@ const debounceManager = new DebounceManager();
 /**
  * 扩展激活函数
  */
-export function activate(context: vscode.ExtensionContext) {
+export async function activate(context: vscode.ExtensionContext) {
     console.log("Start initialize logger");
     // 初始化日志
     initializeLoggerAdapter();
@@ -61,9 +61,9 @@ export function activate(context: vscode.ExtensionContext) {
     const container = getContainer();
     initializeDIContainer(container);
 
-    // 初始化插件
+    // 初始化插件（等待插件激活完成）
     logger.info("Initializing plugins from DI container");
-    initializePlugins();
+    await initializePlugins();
 
     // 创建诊断集合
     logger.info("Diagnostic collection created");
@@ -244,7 +244,7 @@ export function activate(context: vscode.ExtensionContext) {
                     const container = getContainer();
                     container.reset(); // 清除所有单例实例
                     initializeDIContainer(container); // 重新注册所有服务
-                    initializePlugins(); // 重新初始化插件
+                    await initializePlugins(); // 重新初始化插件（等待完成）
 
                     // 步骤 3: 清除所有活跃的防抖定时器
                     debounceManager.clearAll();

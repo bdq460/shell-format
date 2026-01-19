@@ -3,7 +3,8 @@
  */
 
 import { CancellationToken, execute } from "../../executor";
-import { ToolResult } from "../../types";
+import { ExecutionResult } from "../../executor/types";
+import { CheckResult } from "../types";
 import { parseShellcheckOutput } from "./parser";
 
 export interface ShellcheckOptions {
@@ -31,7 +32,7 @@ export class ShellcheckTool {
     /**
      * 检查 Shell 脚本
      */
-    async check(options: ShellcheckOptions): Promise<ToolResult> {
+    async check(options: ShellcheckOptions): Promise<CheckResult> {
         const args = [...(options.commandArgs || this.defaultArges)];
         // 如果提供了content，使用stdin模式，添加'-'作为文件名占位符
         const fileNameOrStdin = options.content ? "-" : options.file;
@@ -42,7 +43,10 @@ export class ShellcheckTool {
             token: options.token,
             stdin: options.content,
         };
-        const result = await execute(this.commandPath, executeOptions);
+        const result: ExecutionResult = await execute(
+            this.commandPath,
+            executeOptions,
+        );
 
         return parseShellcheckOutput(result);
     }

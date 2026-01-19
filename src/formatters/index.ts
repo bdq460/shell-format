@@ -36,19 +36,26 @@ async function runFormat(
 
     const timer = startTimer(PERFORMANCE_METRICS.FORMAT_DURATION);
     try {
-        let edits: vscode.TextEdit[] = [];
-        try {
-            edits = await pluginManager.format(document, {
-                token,
-                timeout: undefined,
-            });
-        } catch (pluginError) {
-            logger.error(`pluginManager.format failed: ${String(pluginError)}`);
-            edits = [];
-        }
+        const result = await pluginManager.format(document, {
+            token,
+            timeout: undefined,
+        });
         timer.stop();
-        logger.debug(`Format returned ${edits.length} edits`);
-        return edits;
+
+        // 处理格式化结果
+        if (result.diagnostics && result.diagnostics.length > 0) {
+            // 如果有诊断信息（如语法错误），记录到日志
+            logger.debug(
+                `Format returned ${result.diagnostics.length} diagnostics: ${result.diagnostics.map(d => d.message).join("; ")}`,
+            );
+        }
+
+        if (result.errorMessage) {
+            logger.warn(`Format error: ${result.errorMessage}`);
+        }
+
+        logger.debug(`Format returned ${result.textEdits.length} edits`);
+        return result.textEdits;
     } catch (error) {
         timer.stop();
         logger.error(`Format failed: ${String(error)}`);

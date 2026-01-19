@@ -200,12 +200,16 @@ export class LoggerAdapter implements Logger, vscode.Disposable {
         switch (level) {
             case LogLevel.DEBUG:
                 console.debug(formattedMessage);
+                break;
             case LogLevel.WARN:
                 console.warn(formattedMessage);
+                break;
             case LogLevel.ERROR:
                 console.error(formattedMessage);
+                break;
             default:
                 console.info(formattedMessage);
+                break;
         }
 
         // 输出到输出通道

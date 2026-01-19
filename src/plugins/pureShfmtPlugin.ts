@@ -14,17 +14,18 @@ import { PERFORMANCE_METRICS } from "../metrics";
 import { ShfmtFormatOptions, ShfmtTool } from "../tools/shell/shfmt/shfmtTool";
 import { logger } from "../utils/log";
 import { startTimer } from "../utils/performance/monitor";
+import { BaseFormatPlugin } from "./baseFormatPlugin";
 import {
     CheckOptions,
     CheckResult,
     FormatOptions,
-    IFormatPlugin,
+    FormatResult,
 } from "./pluginInterface";
 
 /**
  * shfmt 纯插件
  */
-export class PureShfmtPlugin implements IFormatPlugin {
+export class PureShfmtPlugin extends BaseFormatPlugin {
     name = "shfmt";
     displayName = "Shell Format";
     version = "1.0.0";
@@ -34,6 +35,7 @@ export class PureShfmtPlugin implements IFormatPlugin {
     private defaultShfmtOptions: ShfmtFormatOptions;
 
     constructor(shfmtPath: string, indent: number | undefined) {
+        super();
         this.tool = new ShfmtTool(shfmtPath);
         this.defaultShfmtOptions = this.buildDefaultShfmtOptions();
         logger.info(
@@ -48,6 +50,13 @@ export class PureShfmtPlugin implements IFormatPlugin {
             caseIndent: true,
             spaceRedirects: true,
         };
+    }
+
+    /**
+     * 获取插件的诊断源名称
+     */
+    getDiagnosticSource(): string {
+        return "shfmt";
     }
 
     /**
@@ -72,7 +81,7 @@ export class PureShfmtPlugin implements IFormatPlugin {
     async format(
         document: vscode.TextDocument,
         options: FormatOptions,
-    ): Promise<vscode.TextEdit[]> {
+    ): Promise<FormatResult> {
         logger.debug(
             `PureShfmtPlugin.format called with options: ${JSON.stringify(options)}`,
         );
@@ -85,15 +94,19 @@ export class PureShfmtPlugin implements IFormatPlugin {
                 content: document.getText(),
             });
 
-            const edits = FormatterAdapter.convert(result, document);
             timer.stop();
+            logger.debug(`PureShfmtPlugin.format completed`);
 
-            logger.debug(`PureShfmtPlugin.format returned ${edits.length} edits`);
-            return edits;
+            return this.createFormatResult(
+                result,
+                document,
+                PackageInfo.diagnosticSource,
+                FormatterAdapter.convert,
+            );
         } catch (error) {
             timer.stop();
             logger.error(`PureShfmtPlugin.format failed: ${String(error)}`);
-            return [];
+            return this.handleFormatError(document, error);
         }
     }
 
@@ -115,34 +128,19 @@ export class PureShfmtPlugin implements IFormatPlugin {
                 content: document.getText(),
             });
 
-            const diagnostics = DiagnosticAdapter.convert(
+            timer.stop();
+            logger.debug(`PureShfmtPlugin.check completed`);
+
+            return this.createCheckResult(
                 result,
                 document,
                 PackageInfo.diagnosticSource,
+                DiagnosticAdapter.convert,
             );
-
-            // 检查是否有语法错误
-            const hasErrors = diagnostics.some(
-                (diag) => diag.severity === vscode.DiagnosticSeverity.Error,
-            );
-
-            timer.stop();
-
-            logger.debug(
-                `PureShfmtPlugin.check returned ${diagnostics.length} diagnostics`,
-            );
-            return {
-                hasErrors,
-                diagnostics,
-            };
         } catch (error) {
             timer.stop();
             logger.error(`PureShfmtPlugin.check failed: ${String(error)}`);
-            return {
-                hasErrors: true,
-                diagnostics: [],
-                errorMessage: String(error),
-            };
+            return this.handleCheckError(document, error);
         }
     }
 

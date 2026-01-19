@@ -24,7 +24,7 @@ import { PureShfmtPlugin } from "./pureShfmtPlugin";
  *
  * @throws 如果获取插件实例或注册失败
  */
-export function initializePlugins(): void {
+export async function initializePlugins(): Promise<void> {
     logger.info("Initializing plugins from DI container");
 
     try {
@@ -53,14 +53,9 @@ export function initializePlugins(): void {
 
         logger.info("All plugins initialized and registered successfully");
 
-        // 激活已启用的插件
-        activatePlugins()
-            .then(() => {
-                logger.info("Plugin system activated successfully");
-            })
-            .catch((error: unknown) => {
-                logger.error(`Failed to activate plugins: ${String(error)}`);
-            });
+        // 激活已启用的插件（等待完成）
+        await activatePlugins();
+        logger.info("Plugin system activated successfully");
     } catch (error) {
         logger.error(`Failed to initialize plugins: ${String(error)}`);
         throw error;

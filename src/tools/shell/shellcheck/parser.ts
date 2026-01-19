@@ -2,26 +2,38 @@
  * 解析 shellcheck 输出
  */
 
-import { ExecutionResult } from "../../executor";
-import { LinterIssue, ToolResult } from "../../types";
+import { ExecutionResult } from "../../executor/types";
+import { CheckResult, LinterIssue } from "../types";
 
 /**
  * 解析 shellcheck 输出
  * @param result 执行结果
  * @returns 工具结果
  */
-export function parseShellcheckOutput(result: ExecutionResult): ToolResult {
-    const allOutput = `${result.stdout}${result.stderr}`;
+export function parseShellcheckOutput(result: ExecutionResult): CheckResult {
+    let toolResult: CheckResult = {};
 
-    if (!allOutput.trim()) {
-        return { success: true };
+    // 检查执行错误（超时、取消、spawn 错误等）
+    if (result.error) {
+        toolResult.executeErrors = [
+            {
+                command: result.command,
+                exitCode: result.exitCode,
+                message: result.error.message,
+            },
+        ];
     }
 
+    // 成功：检查是否有输出
+    const allOutput = `${result.stdout}${result.stderr}`;
+
+    // 有输出，返回 linter 问题
     const linterIssues = parseIssues(allOutput);
-    return {
-        success: false,
-        linterIssues,
-    };
+    if (linterIssues.length > 0) {
+        toolResult.linterIssues = linterIssues;
+    }
+
+    return toolResult;
 }
 
 /**

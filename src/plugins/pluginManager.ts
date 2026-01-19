@@ -12,6 +12,7 @@ import {
     CheckOptions,
     CheckResult,
     FormatOptions,
+    FormatResult,
     IFormatPlugin,
 } from "./pluginInterface";
 
@@ -140,7 +141,7 @@ export class PluginManager {
     async format(
         document: vscode.TextDocument,
         options: FormatOptions,
-    ): Promise<vscode.TextEdit[]> {
+    ): Promise<FormatResult> {
         const timer = startTimer(
             PERFORMANCE_METRICS.PLUGIN_EXECUTE_FORMAT_DURATION,
         );
@@ -151,24 +152,64 @@ export class PluginManager {
         if (this.activePlugins.size === 0) {
             logger.warn("No active plugins available for formatting");
             timer.stop();
-            return [];
+            return {
+                hasErrors: true,
+                diagnostics: [],
+                errorMessage: "No active plugins available",
+                textEdits: [],
+            };
         }
 
+        const allDiagnostics: vscode.Diagnostic[] = [];
         const errors: string[] = [];
+        let hasErrors = false;
+
         for (const name of this.activePlugins) {
             const plugin = this.plugins.get(name);
 
             if (plugin) {
                 try {
                     logger.debug(`Attempting to format with plugin: ${name}`);
-                    const edits = await plugin.format(document, options);
+                    if (!plugin.format) {
+                        logger.debug(
+                            `Plugin "${name}" does not implement format(), skipping`,
+                        );
+                        continue;
+                    }
+                    const result = await plugin.format(document, options);
 
-                    if (edits && edits.length > 0) {
+                    // 收集诊断信息
+                    if (result.diagnostics && result.diagnostics.length > 0) {
+                        allDiagnostics.push(...result.diagnostics);
+                    }
+
+                    // 检查是否有错误
+                    if (result.hasErrors) {
+                        hasErrors = true;
+                        if (result.errorMessage) {
+                            errors.push(`Plugin "${name}": ${result.errorMessage}`);
+                            // 将 errorMessage 转化为 diagnostic
+                            const errorDiagnostic = this.createErrorDiagnostic(
+                                result.errorMessage,
+                                document,
+                                name,
+                            );
+                            allDiagnostics.push(errorDiagnostic);
+                        }
+                    }
+
+                    // 如果有文本编辑，返回结果
+                    if (result.textEdits && result.textEdits.length > 0) {
                         timer.stop();
                         logger.info(
-                            `Successfully formatted with plugin: ${name} (${edits.length} edits)`,
+                            `Successfully formatted with plugin: ${name} (${result.textEdits.length} edits)`,
                         );
-                        return edits;
+                        return {
+                            hasErrors,
+                            diagnostics: allDiagnostics,
+                            errorMessage: hasErrors ? errors.join("; ") : undefined,
+                            textEdits: result.textEdits,
+                        };
                     } else {
                         logger.debug(
                             `Plugin "${name}" returned no edits, trying next plugin`,
@@ -178,6 +219,14 @@ export class PluginManager {
                     const msg = `Plugin "${name}" format failed: ${String(error)}, trying next plugin`;
                     logger.error(msg);
                     errors.push(msg);
+                    hasErrors = true;
+                    // 将异常错误转化为 diagnostic
+                    const errorDiagnostic = this.createErrorDiagnostic(
+                        msg,
+                        document,
+                        name,
+                    );
+                    allDiagnostics.push(errorDiagnostic);
                 }
             }
         }
@@ -186,10 +235,16 @@ export class PluginManager {
         if (errors.length > 0) {
             logger.warn(`Format errors: \n${errors.join("\n")}`);
         }
-        logger.warn(
-            `No active plugin successfully formatted the document: ${document.fileName}`,
-        );
-        return [];
+        logger.info(`No text edits returned for document: ${document.fileName}`);
+        return {
+            hasErrors,
+            diagnostics: allDiagnostics,
+            errorMessage:
+                errors.length > 0
+                    ? "Format failed with error. Check the Problems panel."
+                    : undefined,
+            textEdits: [],
+        };
     }
 
     /**
@@ -213,6 +268,7 @@ export class PluginManager {
             return {
                 hasErrors: false,
                 diagnostics: [],
+                errorMessage: "No active plugins available for checking",
             };
         }
 
@@ -243,12 +299,27 @@ export class PluginManager {
                         logger.error(
                             `Plugin "${name}" check error: ${result.errorMessage}`,
                         );
+                        errors.push(`Plugin "${name}": ${result.errorMessage}`);
+                        // 将 errorMessage 转化为 diagnostic
+                        const errorDiagnostic = this.createErrorDiagnostic(
+                            result.errorMessage,
+                            document,
+                            name,
+                        );
+                        allDiagnostics.push(errorDiagnostic);
                     }
                 } catch (error) {
                     const msg = `Plugin "${name}" check failed: ${String(error)}`;
                     logger.error(msg);
                     errors.push(msg);
                     hasErrors = true;
+                    // 将异常错误转化为 diagnostic
+                    const errorDiagnostic = this.createErrorDiagnostic(
+                        msg,
+                        document,
+                        name,
+                    );
+                    allDiagnostics.push(errorDiagnostic);
                 }
             }
         }
@@ -264,6 +335,10 @@ export class PluginManager {
         return {
             hasErrors,
             diagnostics: allDiagnostics,
+            errorMessage:
+                errors.length > 0
+                    ? "Checking failed with error. Check the Problems panel."
+                    : undefined,
         };
     }
 
@@ -274,6 +349,35 @@ export class PluginManager {
         this.plugins.clear();
         this.activePlugins.clear();
         logger.info("Cleared all plugins");
+    }
+
+    /**
+     * 将错误消息转化为 Diagnostic
+     * @param errorMessage 错误消息
+     * @param document 文档对象
+     * @param source 错误来源（插件名称）
+     * @returns Diagnostic 对象
+     */
+    private createErrorDiagnostic(
+        errorMessage: string,
+        document: vscode.TextDocument,
+        source: string,
+    ): vscode.Diagnostic {
+        let line = 0;
+        let column = 0;
+
+        const range = new vscode.Range(
+            new vscode.Position(line, column),
+            new vscode.Position(line, column),
+        );
+
+        const diagnostic = new vscode.Diagnostic(
+            range,
+            errorMessage,
+            vscode.DiagnosticSeverity.Error,
+        );
+        diagnostic.source = source;
+        return diagnostic;
     }
 
     /**

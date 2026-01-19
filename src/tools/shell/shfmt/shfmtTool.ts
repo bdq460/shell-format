@@ -4,7 +4,8 @@
  */
 
 import { CancellationToken, execute } from "../../executor";
-import { ToolResult } from "../../types";
+import { ExecutionResult } from "../../executor/types";
+import { CheckResult, FormatResult } from "../types";
 import { parseShfmtOutput } from "./parser";
 
 /**
@@ -23,17 +24,18 @@ export class ShfmtTool {
     async format(
         fileName: string,
         options?: Partial<ShfmtFormatOptions>,
-    ): Promise<ToolResult> {
+    ): Promise<FormatResult> {
         const args = this.buildFormatArgs(options || {});
         // 如果提供了content，使用stdin模式，添加'-'作为文件名占位符
         const fileNameOrStdin = options?.content ? "-" : fileName;
         args.push(fileNameOrStdin);
 
-        const result = await execute(this.commandPath, {
+        const result: ExecutionResult = await execute(this.commandPath, {
             args: args,
             token: options?.token,
             stdin: options?.content,
         });
+
         return parseShfmtOutput(result, "format");
     }
 
@@ -43,13 +45,13 @@ export class ShfmtTool {
     async check(
         fileName: string,
         options?: Partial<ShfmtCheckOptions>,
-    ): Promise<ToolResult> {
+    ): Promise<CheckResult> {
         const args = this.buildCheckArgs(options || {});
         // 如果提供了content，使用stdin模式，添加'-'作为文件名占位符
         const fileNameOrStdin = options?.content ? "-" : fileName;
         args.push(fileNameOrStdin);
 
-        const result = await execute(this.commandPath, {
+        const result: ExecutionResult = await execute(this.commandPath, {
             args: args,
             token: options?.token,
             stdin: options?.content,

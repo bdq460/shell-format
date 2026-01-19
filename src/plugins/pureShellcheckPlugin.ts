@@ -11,18 +11,14 @@ import { PERFORMANCE_METRICS } from "../metrics";
 import { ShellcheckTool } from "../tools/shell/shellcheck/shellcheckTool";
 import { logger } from "../utils";
 import { startTimer } from "../utils/performance/monitor";
-import {
-    CheckOptions,
-    CheckResult,
-    FormatOptions,
-    IFormatPlugin,
-} from "./pluginInterface";
+import { BaseFormatPlugin } from "./baseFormatPlugin";
+import { CheckOptions, CheckResult } from "./pluginInterface";
 
 /**
  * shellcheck 纯插件
  * 注意：shellcheck 只提供检查功能，不提供格式化功能
  */
-export class PureShellcheckPlugin implements IFormatPlugin {
+export class PureShellcheckPlugin extends BaseFormatPlugin {
     name = "shellcheck";
     displayName = "ShellCheck";
     version = "1.0.0";
@@ -31,10 +27,18 @@ export class PureShellcheckPlugin implements IFormatPlugin {
     private tool: ShellcheckTool;
 
     constructor(shellcheckPath: string) {
+        super();
         this.tool = new ShellcheckTool(shellcheckPath);
         logger.info(
             `PureShellcheckPlugin initialized with path: ${shellcheckPath}`,
         );
+    }
+
+    /**
+     * 获取插件的诊断源名称
+     */
+    getDiagnosticSource(): string {
+        return "shellcheck";
     }
 
     /**
@@ -48,18 +52,6 @@ export class PureShellcheckPlugin implements IFormatPlugin {
             logger.warn(`shellcheck is not available: ${String(error)}`);
             return false;
         }
-    }
-
-    /**
-     * 格式化文档
-     * shellcheck 不支持格式化，返回空数组
-     */
-    async format(
-        _document: vscode.TextDocument,
-        _options: FormatOptions,
-    ): Promise<vscode.TextEdit[]> {
-        logger.debug("PureShellcheckPlugin.format called (not supported)");
-        return [];
     }
 
     /**
@@ -81,33 +73,19 @@ export class PureShellcheckPlugin implements IFormatPlugin {
                 content: document.getText(),
             });
 
-            const diagnostics = DiagnosticAdapter.convert(
+            timer.stop();
+            logger.debug(`PureShellcheckPlugin.check completed`);
+
+            return this.createCheckResult(
                 result,
                 document,
                 PackageInfo.diagnosticSource,
+                DiagnosticAdapter.convert,
             );
-
-            // 检查是否有错误或警告
-            const hasErrors = diagnostics.some(
-                (diag) => diag.severity === vscode.DiagnosticSeverity.Error,
-            );
-            timer.stop();
-
-            logger.debug(
-                `PureShellcheckPlugin.check returned ${diagnostics.length} diagnostics`,
-            );
-            return {
-                hasErrors,
-                diagnostics,
-            };
         } catch (error) {
             timer.stop();
             logger.error(`PureShellcheckPlugin.check failed: ${String(error)}`);
-            return {
-                hasErrors: true,
-                diagnostics: [],
-                errorMessage: String(error),
-            };
+            return this.handleCheckError(document, error);
         }
     }
 

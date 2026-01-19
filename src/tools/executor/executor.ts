@@ -6,8 +6,7 @@
 
 import { spawn } from "child_process";
 import { logger } from "../../utils/log";
-import { ToolExecutionError } from "../errors";
-import { ExecutionResult, ExecutorOptions } from "./types";
+import { ErrorType, ExecutionResult, ExecutorOptions } from "./types";
 
 /**
  * 通用进程执行器
@@ -16,6 +15,7 @@ import { ExecutionResult, ExecutorOptions } from "./types";
  * - 支持超时控制（默认 30 秒）
  * - 支持取消令牌
  * - 完整的错误处理和资源清理
+ * - 所有异常都反映在 ExecutionResult 中，不会抛出
  */
 export async function execute(
     command: string,
@@ -25,11 +25,19 @@ export async function execute(
     const timeout = (options as any).timeout ?? 30000; // 默认 30 秒超时
     const fullCommand = `${command} ${args.join(" ")}`;
 
-    return new Promise((resolve, reject) => {
+    return new Promise((resolve) => {
         // 检查是否已请求取消
         if (token?.isCancellationRequested) {
-            logger?.info(`Execute ${fullCommand} cancelled before start`);
-            reject(new Error(`Execute ${fullCommand} cancelled`));
+            resolve({
+                command: fullCommand,
+                exitCode: null,
+                stdout: "",
+                stderr: "",
+                error: {
+                    type: ErrorType.Cancelled,
+                    message: `Execute ${fullCommand} cancelled before start`,
+                },
+            });
             return;
         }
 
@@ -38,6 +46,7 @@ export async function execute(
         const stdout: Buffer[] = [];
         const stderr: Buffer[] = [];
         let timedOut = false;
+        let cancelled = false;
 
         // 如果提供了stdin内容，写入进程的标准输入
         if (stdin) {
@@ -66,13 +75,21 @@ export async function execute(
             if (timeout && timeout > 0) {
                 timeoutHandle = setTimeout(() => {
                     timedOut = true;
+                    const stdoutStr = Buffer.concat(stdout).toString();
+                    const stderrStr = Buffer.concat(stderr).toString();
                     logger?.warn(`Execute ${fullCommand} timed out after ${timeout}ms`);
                     cleanup();
-                    reject(
-                        new Error(
-                            `Execute ${fullCommand} timed out after ${timeout}ms. Command execution exceeded the maximum allowed time.`,
-                        ),
-                    );
+
+                    resolve({
+                        command: fullCommand,
+                        exitCode: null,
+                        stdout: stdoutStr,
+                        stderr: stderrStr,
+                        error: {
+                            type: ErrorType.Timeout,
+                            message: `Execute ${fullCommand} timed out after ${timeout}ms. Command execution exceeded the maximum allowed time.`,
+                        },
+                    });
                 }, timeout);
             }
         };
@@ -85,12 +102,28 @@ export async function execute(
             }
         };
 
-        // 取消处理器：清理进程并拒绝Promise
+        // 取消处理器：清理进程并返回错误结果
         const cancelHandler = () => {
+            if (timedOut) {
+                return; // 超时已经处理了
+            }
+            cancelled = true;
             logger?.info("Killing process due to cancellation");
             clearTimeoutHandler();
             cleanup();
-            reject(new Error(`Execute ${fullCommand} cancelled`));
+            const stdoutStr = Buffer.concat(stdout).toString();
+            const stderrStr = Buffer.concat(stderr).toString();
+
+            resolve({
+                command: fullCommand,
+                exitCode: null,
+                stdout: stdoutStr,
+                stderr: stderrStr,
+                error: {
+                    type: ErrorType.Cancelled,
+                    message: `Execute ${fullCommand} cancelled`,
+                },
+            });
         };
 
         // 订阅取消事件，返回Disposable对象或void
@@ -119,8 +152,8 @@ export async function execute(
 
         // 监听进程关闭事件
         process.on("close", (code) => {
-            // 如果已经因超时拒绝了，则不再处理
-            if (timedOut) {
+            // 如果已经因超时或取消处理了，则不再处理
+            if (timedOut || cancelled) {
                 return;
             }
 
@@ -132,25 +165,66 @@ export async function execute(
 
             // 清理监听器, 避免内存泄漏
             unsubscribe();
+
             // 返回执行结果
             resolve({
+                command: fullCommand,
                 exitCode: code,
                 stdout: stdoutStr,
                 stderr: stderrStr,
             });
         });
 
-        // 监听进程错误事件
+        // 监听进程错误事件（如命令不存在、权限不足等）
         process.on("error", (err) => {
-            // 如果已经因超时拒绝了，则不再处理
-            if (timedOut) {
+            // 如果已经因超时或取消处理了，则不再处理
+            if (timedOut || cancelled) {
                 return;
             }
 
+            const stdoutStr = Buffer.concat(stdout).toString();
+            const stderrStr = Buffer.concat(stderr).toString();
             logger?.error(`Execution ${fullCommand} error: ${err.message}`);
+
             // 清理监听器
             unsubscribe();
-            reject(new ToolExecutionError(err as NodeJS.ErrnoException, fullCommand));
+
+            resolve({
+                command: fullCommand,
+                exitCode: null,
+                stdout: stdoutStr,
+                stderr: stderrStr,
+                error: {
+                    type: ErrorType.Execution,
+                    code: (err as NodeJS.ErrnoException).code,
+                    message: generateExecutionErrorMessage(
+                        err as NodeJS.ErrnoException,
+                        fullCommand,
+                    ),
+                },
+            });
         });
     });
+}
+
+/**
+ * 生成执行错误消息（参考 ToolExecutionError）
+ * @param error 原始错误
+ * @param command 完整命令
+ * @returns 错误消息
+ */
+function generateExecutionErrorMessage(
+    error: NodeJS.ErrnoException,
+    command: string,
+): string {
+    const commandName = command.split(" ")[0];
+
+    switch (error.code) {
+        case "ENOENT":
+            return `${commandName} not installed`;
+        case "EACCES":
+            return `Permission denied when running ${commandName}`;
+        default:
+            return `Failed to run ${commandName}: ${error.message}`;
+    }
 }

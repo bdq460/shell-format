@@ -48,6 +48,17 @@ export interface CheckResult {
     errorMessage?: string;
 }
 
+export interface FormatResult {
+    /** 是否有错误 */
+    hasErrors: boolean;
+    /** 诊断信息 */
+    diagnostics: Diagnostic[];
+    /** 错误信息（如果有） */
+    errorMessage?: string;
+    /** 格式化编辑列表, 如果为空, 表示没有格式变化 */
+    textEdits: TextEdit[];
+}
+
 /**
  * 格式化和检查插件接口
  */
@@ -84,7 +95,10 @@ export interface IFormatPlugin {
      * @param options 格式化选项
      * @returns 格式化后的 TextEdit 数组
      */
-    format(document: TextDocument, options: FormatOptions): Promise<TextEdit[]>;
+    format?(
+        document: TextDocument,
+        options: FormatOptions,
+    ): Promise<FormatResult>;
 
     /**
      * 检查内容

@@ -7,10 +7,15 @@
  * 工具检查结果
  */
 export interface ToolResult {
-    success: boolean;
     syntaxErrors?: SyntaxError[];
     formatIssues?: FormatIssue[];
     linterIssues?: LinterIssue[];
+    executeErrors?: ExecuteError[];
+}
+
+export interface CheckResult extends ToolResult { }
+
+export interface FormatResult extends ToolResult {
     formattedContent?: string;
 }
 
@@ -22,8 +27,8 @@ export interface ToolResult {
  * 可执行性: ❌ 不可执行，必须修复
  */
 export interface SyntaxError {
-    line: number;      // 0-based
-    column: number;    // 0-based
+    line: number; // 0-based
+    column: number; // 0-based
     message: string;
 }
 
@@ -36,12 +41,12 @@ export interface SyntaxError {
  * 示例: 缩进混乱、空格不一致、换行位置不统一等
  */
 export interface FormatIssue {
-    line: number;      // 问题所在的行号（0-based）
-    column: number;     // 问题所在的列号（0-based）
+    line: number; // 问题所在的行号（0-based）
+    column: number; // 问题所在的列号（0-based）
     rangeLength: number; // 问题范围的长度（用于高亮）
-    oldContent?: string;  // 原始内容（带 - 前缀的行）
-    newContent?: string;  // 新内容（带 + 前缀的行）
-    message?: string;  // 问题描述
+    oldContent?: string; // 原始内容（带 - 前缀的行）
+    newContent?: string; // 新内容（带 + 前缀的行）
+    message?: string; // 问题描述
 }
 
 /**
@@ -59,7 +64,16 @@ export interface FormatIssue {
 export interface LinterIssue {
     line: number;
     column: number;
-    type: 'error' | 'warning' | 'info';
+    type: "error" | "warning" | "info";
     code: string;
+    message: string;
+}
+
+/**
+ * 执行错误类型
+ */
+export interface ExecuteError {
+    command: string;
+    exitCode: number | null;
     message: string;
 }
