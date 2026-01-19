@@ -107,4 +107,22 @@ export interface IFormatPlugin {
      * @returns 文件扩展名数组（如 ['.sh', '.bash']）
      */
     getSupportedExtensions(): string[];
+
+    /**
+     * 插件激活时调用（可选）
+     * 用于初始化资源、注册事件监听器等
+     */
+    onActivate?(): void | Promise<void>;
+
+    /**
+     * 插件停用时调用（可选）
+     * 用于清理资源、取消事件监听器等
+     */
+    onDeactivate?(): void | Promise<void>;
+
+    /**
+     * 插件配置变更时调用（可选）
+     * @param config 新的配置对象
+     */
+    onConfigChange?(config: any): void | Promise<void>;
 }

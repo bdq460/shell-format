@@ -111,13 +111,13 @@ Error handling method / 错误处理方式
 
 ## Plugin Commands 插件命令
 
-|| Command                                             | Description                                                            |
-|| --------------------------------------------------- | ---------------------------------------------------------------------- |
-|| shell-format.formatDocument                          | Format entire document / 格式化整个文档                                 |
-|| shell-format.fixAllProblems                          | Fix all formatting issues with one click / 一键修复所有格式问题               |
-|| shell-format.showPerformanceReport                    | Show performance metrics / 显示性能指标                                     |
-|| shell-format.resetPerformanceMetrics                  | Reset performance metrics / 重置性能指标                                   |
-|| shell-format.showPluginStatus                        | Show plugin status / 显示插件状态                                         |
+| Command                              | Description                                                     |
+| ------------------------------------ | --------------------------------------------------------------- |
+| shell-format.formatDocument          | Format entire document / 格式化整个文档                         |
+| shell-format.fixAllProblems          | Fix all formatting issues with one click / 一键修复所有格式问题 |
+| shell-format.showPerformanceReport   | Show performance metrics / 显示性能指标                         |
+| shell-format.resetPerformanceMetrics | Reset performance metrics / 重置性能指标                        |
+| shell-format.showPluginStatus        | Show plugin status / 显示插件状态                               |
 
 ## Usage 使用方法
 

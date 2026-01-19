@@ -31,6 +31,7 @@ export class PureShfmtPlugin extends BaseFormatPlugin {
 
     private tool: ShfmtTool;
     private defaultShfmtOptions: ShfmtFormatOptions;
+    private watcher?: vscode.FileSystemWatcher;
 
     constructor(shfmtPath: string, indent: number | undefined) {
         super();
@@ -145,5 +146,48 @@ export class PureShfmtPlugin extends BaseFormatPlugin {
      */
     getSupportedExtensions(): string[] {
         return PackageInfo.fileExtensions;
+    }
+
+    /**
+     * 插件激活时的钩子
+     * 示例：创建文件系统监视器
+     */
+    async onActivate(): Promise<void> {
+        logger.info(`${this.name} plugin activated`);
+
+        // 示例：创建文件监视器（如果需要监视文件变化）
+        // this.watcher = vscode.workspace.createFileSystemWatcher('**/*.sh');
+        // this.watcher.onDidChange((uri) => {
+        //     logger.debug(`File changed: ${uri.fsPath}`);
+        //     // 处理文件变化逻辑
+        // });
+    }
+
+    /**
+     * 插件停用时的钩子
+     * 示例：清理文件系统监视器
+     */
+    async onDeactivate(): Promise<void> {
+        logger.info(`${this.name} plugin deactivated`);
+
+        // 清理资源
+        if (this.watcher) {
+            this.watcher.dispose();
+            this.watcher = undefined;
+        }
+    }
+
+    /**
+     * 配置变更时的钩子
+     * 示例：重新加载配置
+     */
+    async onConfigChange(config: any): Promise<void> {
+        logger.info(`${this.name} config changed: ${JSON.stringify(config)}`);
+
+        // 示例：重新加载配置
+        if (config.indent !== undefined) {
+            this.defaultShfmtOptions = this.buildDefaultShfmtOptions();
+            logger.debug(`Reloaded default options with indent: ${this.defaultShfmtOptions.indent}`);
+        }
     }
 }

@@ -49,12 +49,25 @@ export class PluginManager {
      * 注销插件
      * @param name 插件名称
      */
-    unregister(name: string): void {
+    async unregister(name: string): Promise<void> {
         const plugin = this.plugins.get(name);
 
         if (!plugin) {
             logger.warn(`Plugin "${name}" is not registered`);
             return;
+        }
+
+        // 调用插件停用钩子
+        if (plugin.onDeactivate) {
+            try {
+                const result = plugin.onDeactivate();
+                if (result instanceof Promise) {
+                    await result;
+                }
+                logger.debug(`Plugin "${name}" onDeactivate hook executed`);
+            } catch (error) {
+                logger.error(`Plugin "${name}" onDeactivate hook failed: ${String(error)}`);
+            }
         }
 
         this.plugins.delete(name);
@@ -328,13 +341,11 @@ export class PluginManager {
         document: vscode.TextDocument,
         source: string,
     ): vscode.Diagnostic {
-        let line = 0;
-        let column = 0;
-
-        const range = new vscode.Range(
-            new vscode.Position(line, column),
-            new vscode.Position(line, column),
-        );
+        // 使用文档的第一行或空文档的默认位置
+        const range =
+            document.lineCount > 0
+                ? document.lineAt(0).range
+                : new vscode.Range(0, 0, 0, 0);
 
         const diagnostic = new vscode.Diagnostic(
             range,
@@ -348,8 +359,25 @@ export class PluginManager {
     /**
      * 停用所有插件
      */
-    deactivateAll(): void {
+    async deactivateAll(): Promise<void> {
         const count = this.activePlugins.size;
+
+        // 调用所有活动插件的停用钩子
+        for (const name of this.activePlugins) {
+            const plugin = this.plugins.get(name);
+            if (plugin && plugin.onDeactivate) {
+                try {
+                    const result = plugin.onDeactivate();
+                    if (result instanceof Promise) {
+                        await result;
+                    }
+                    logger.debug(`Plugin "${name}" onDeactivate hook executed`);
+                } catch (error) {
+                    logger.error(`Plugin "${name}" onDeactivate hook failed: ${String(error)}`);
+                }
+            }
+        }
+
         this.activePlugins.clear();
         logger.info(`Deactivated all ${count} plugins`);
     }
@@ -361,7 +389,7 @@ export class PluginManager {
      */
     async reactivate(names: string[]): Promise<number> {
         logger.info("Reactivating plugins: deactivate all then activate selected");
-        this.deactivateAll();
+        await this.deactivateAll();
         return this.activateMultiple(names);
     }
 
@@ -411,11 +439,40 @@ export class PluginManager {
             logger.error(`Plugin "${name}" is not registered`);
             return false;
         }
+
+        // 如果已经激活，先调用停用钩子再激活
+        if (this.activePlugins.has(name) && plugin.onDeactivate) {
+            try {
+                const result = plugin.onDeactivate();
+                if (result instanceof Promise) {
+                    await result;
+                }
+                logger.debug(`Plugin "${name}" onDeactivate hook executed before reactivation`);
+            } catch (error) {
+                logger.error(`Plugin "${name}" onDeactivate hook failed: ${String(error)}`);
+            }
+        }
+
         const isAvailable = await plugin.isAvailable();
         if (!isAvailable) {
             logger.warn(`Plugin "${name}" is not available`);
             return false;
         }
+
+        // 调用插件激活钩子
+        if (plugin.onActivate) {
+            try {
+                const result = plugin.onActivate();
+                if (result instanceof Promise) {
+                    await result;
+                }
+                logger.debug(`Plugin "${name}" onActivate hook executed`);
+            } catch (error) {
+                logger.error(`Plugin "${name}" onActivate hook failed: ${String(error)}`);
+                // 激活钩子失败不影响插件激活，只记录日志
+            }
+        }
+
         this.activePlugins.add(name);
         logger.info(`Activated plugin: ${name}`);
         return true;
@@ -464,6 +521,29 @@ export class PluginManager {
             active: this.activePlugins.size,
             plugins,
         };
+    }
+
+    /**
+     * 通知所有活动插件配置已变更
+     * @param config 新的配置对象
+     */
+    async notifyConfigChange(config: any): Promise<void> {
+        logger.info(`Notifying ${this.activePlugins.size} active plugins of config change`);
+
+        for (const name of this.activePlugins) {
+            const plugin = this.plugins.get(name);
+            if (plugin && plugin.onConfigChange) {
+                try {
+                    const result = plugin.onConfigChange(config);
+                    if (result instanceof Promise) {
+                        await result;
+                    }
+                    logger.debug(`Plugin "${name}" onConfigChange hook executed`);
+                } catch (error) {
+                    logger.error(`Plugin "${name}" onConfigChange hook failed: ${String(error)}`);
+                }
+            }
+        }
     }
 }
 
