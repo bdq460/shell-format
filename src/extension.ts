@@ -1,5 +1,5 @@
 /**
- * Shell Format VSCode Extension
+ * Shell Formatter VSCode Extension
  * 基于 shfmt 和 shellcheck 的 Shell 脚本格式化插件
  */
 

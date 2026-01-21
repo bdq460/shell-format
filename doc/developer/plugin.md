@@ -2,7 +2,7 @@
 
 ## 概述
 
-Shell Format 采用通用的、框架无关的插件系统，提供：
+Shell Formatter 采用通用的、框架无关的插件系统，提供：
 
 - ✅ 统一的插件生命周期管理
 - ✅ 解耦的消息总线通信
@@ -446,7 +446,7 @@ import { logger } from "../utils/log";
 
 export class ShfmtPlugin extends BasePlugin {
   name = "shfmt";
-  displayName = "Shell Format (shfmt)";
+  displayName = "Shell Formatter (shfmt)";
   version = "1.0.0";
   description = "Format shell scripts using shfmt";
 

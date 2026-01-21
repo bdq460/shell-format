@@ -24,7 +24,7 @@ import {
  */
 export class PureShfmtPlugin extends BaseFormatPlugin {
     name = "shfmt";
-    displayName = "Shell Format";
+    displayName = "Shell Formatter";
     version = "1.0.0";
     description = "Format and check shell scripts using shfmt";
 

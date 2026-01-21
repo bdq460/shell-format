@@ -1,4 +1,4 @@
-# Shell Format
+# Shell Formatter
 
 > Intelligent Shell script formatting and checking tool based on shfmt and shellcheck
 
@@ -8,7 +8,7 @@
 
 ### Project Overview
 
-Shell Format is a VSCode extension that provides Shell script formatting and diagnosis features. It adopts a plugin-based architecture with dependency injection, supporting dynamic plugin loading, performance monitoring, and configuration-driven plugin activation.
+Shell Formatter is a VSCode extension that provides Shell script formatting and diagnosis features. It adopts a plugin-based architecture with dependency injection, supporting dynamic plugin loading, performance monitoring, and configuration-driven plugin activation.
 
 ### Core Features
 
@@ -94,8 +94,8 @@ For end-user documentation, see [doc/user/README.md](doc/user/README.md):
 
 ## Links
 
-- [GitHub](https://github.com/bdq460/shell-format)
-- [Issues](https://github.com/bdq460/shell-format/issues)
+- [GitHub](https://github.com/bdq460/shell-formatter)
+- [Issues](https://github.com/bdq460/shell-formatter/issues)
 - [License](LICENSE)
 
 ## Acknowledgments
