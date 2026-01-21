@@ -77,4 +77,4 @@ echo "✅ 打包完成！"
 echo "========================================="
 echo ""
 echo "扩展包已生成在: ${PROJECT_ROOT}"
-find . -maxdepth 1 -name "shell-format-*.vsix" -exec ls -lh {} \; | awk '{print $9, "(" $5 ")"}'
+find . -maxdepth 1 -name "shell-formatter-*.vsix" -exec ls -lh {} \; | awk '{print $9, "(" $5 ")"}'

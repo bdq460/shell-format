@@ -72,7 +72,7 @@ if bash "${MANAGE_SCRIPT}" check &> /dev/null; then
     echo -e "${GREEN}✓ 替换成功${NC}"
 
     # 验证内容是否被替换
-    if grep -q "shell-format" "${PROJECT_ROOT}/README.md" \
+    if grep -q "shell-formatter" "${PROJECT_ROOT}/README.md" \
         && grep -q "基于 shfmt 和 shellcheck" "${PROJECT_ROOT}/README.md"; then
         echo -e "${GREEN}✓ 内容验证通过（用户文档）${NC}"
     else

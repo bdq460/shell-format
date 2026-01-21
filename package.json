@@ -1,13 +1,13 @@
 {
-    "name": "shell-format",
-    "displayName": "Shell Format",
+    "name": "shell-formatter",
+    "displayName": "Shell Formatter",
     "description": "Intelligent Shell script formatting and error checking fixing with shfmt and shellcheck",
     "version": "1.0.0",
     "publisher": "bdq460",
     "icon": "icon.png",
     "repository": {
         "type": "git",
-        "url": "https://github.com/bdq460/shell-format.git"
+        "url": "https://github.com/bdq460/shell-formatter.git"
     },
     "engines": {
         "vscode": "^1.74.0"
@@ -18,7 +18,7 @@
     ],
     "activationEvents": [
         "onLanguage:shellscript",
-        "onCommand:shell-format.fixAllProblems"
+        "onCommand:shell-formatter.fixAllProblems"
     ],
     "main": "./dist/extension.js",
     "contributes": {
@@ -41,7 +41,7 @@
             "type": "object",
             "title": "Shell Format",
             "properties": {
-                "shell-format.tabSize": {
+                "shell-formatter.tabSize": {
                     "type": [
                         "number",
                         "string"
@@ -53,7 +53,7 @@
                     "default": "vscode",
                     "description": "Indentation size: number for spaces or 'tab' for tabs (used with shfmt -i/-tabs), value can be one of [vscode, ignore] or number. vscode:use vscode tab size, ignore: ignore tab check and format.default is vscode"
                 },
-                "shell-format.log": {
+                "shell-formatter.log": {
                     "type": "object",
                     "default": {
                         "enabled": false,
@@ -85,7 +85,7 @@
                     },
                     "description": "Log configuration: control whether logging is enabled, log level, and log format"
                 },
-                "shell-format.onError": {
+                "shell-formatter.onError": {
                     "type": "string",
                     "enum": [
                         "showProblem",
@@ -94,7 +94,7 @@
                     "default": "showProblem",
                     "description": "How to handle shfmt errors"
                 },
-                "shell-format.plugins.shfmt": {
+                "shell-formatter.plugins.shfmt": {
                     "type": "object",
                     "default": {
                         "enabled": true,
@@ -114,7 +114,7 @@
                     },
                     "description": "Shfmt plugin configuration"
                 },
-                "shell-format.plugins.shellcheck": {
+                "shell-formatter.plugins.shellcheck": {
                     "type": "object",
                     "default": {
                         "enabled": true,
@@ -138,37 +138,37 @@
         },
         "commands": [
             {
-                "command": "shell-format.formatDocument",
-                "title": "shell-format: Format document"
+                "command": "shell-formatter.formatDocument",
+                "title": "shell-formatter: Format document"
             },
             {
-                "command": "shell-format.fixAllProblems",
-                "title": "shell-format: Fix all problems"
+                "command": "shell-formatter.fixAllProblems",
+                "title": "shell-formatter: Fix all problems"
             },
             {
-                "command": "shell-format.showPerformanceReport",
-                "title": "shell-format: Show performance report"
+                "command": "shell-formatter.showPerformanceReport",
+                "title": "shell-formatter: Show performance report"
             },
             {
-                "command": "shell-format.resetPerformanceMetrics",
-                "title": "shell-format: Reset shell-format performance metrics"
+                "command": "shell-formatter.resetPerformanceMetrics",
+                "title": "shell-formatter: Reset shell-formatter performance metrics"
             },
             {
-                "command": "shell-format.showPluginStatus",
-                "title": "shell-format: Show plugin status"
+                "command": "shell-formatter.showPluginStatus",
+                "title": "shell-formatter: Show plugin status"
             }
         ],
         "codeActions": [
             {
-                "kind": "quickfix.shell-format",
-                "title": "Fix this issue with shell-format",
+                "kind": "quickfix.shell-formatter",
+                "title": "Fix this issue with shell-formatter",
                 "languages": [
                     "shellscript"
                 ]
             },
             {
-                "kind": "source.fixAll.shell-format",
-                "title": "Fix all problems with shell-format",
+                "kind": "source.fixAll.shell-formatter",
+                "title": "Fix all problems with shell-formatter",
                 "languages": [
                     "shellscript"
                 ]
@@ -177,7 +177,7 @@
     },
     "scripts": {
         "package:extension": "bash scripts/safe-package.sh",
-        "install:extension": "npm run package:extension && code --install-extension $(ls shell-format-*.vsix) --extensions-dir ~/.vscode/extensions",
+        "install:extension": "npm run package:extension && code --install-extension $(ls shell-formatter-*.vsix) --extensions-dir ~/.vscode/extensions",
         "vscode:prepublish": "npm run compile",
         "clean": "rm -rf dist/*",
         "compile": "tsc -p ./",
